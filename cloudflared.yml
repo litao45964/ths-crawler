@@ -1,12 +1,7 @@
-# Cloudflare Tunnel 配置模板
-# 使用前需先执行: cloudflared tunnel login
-# 然后: cloudflared tunnel create ths-crawler
-# 最后把生成的 credentials-file 路径填到下面
-
-tunnel: ths-crawler
-credentials-file: /root/.cloudflared/<TUNNEL_ID>.json
+tunnel: 49a96449-9fff-44c7-ad3d-1004586f5e91
+credentials-file: /root/.cloudflared/49a96449-9fff-44c7-ad3d-1004586f5e91.json
 
 ingress:
-  - hostname: <YOUR_DOMAIN>
+  - hostname: ths.thsflow.xyz
     service: http://localhost:8080
   - service: http_status:404
