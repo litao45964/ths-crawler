@@ -43,8 +43,8 @@
 
 0. **沙箱崩溃/重启？** → `git clone git@github.com:litao45964/ths-crawler.git` 从GitHub拉代码基线（铁律：代码不从项目空间拼凑；非代码文件如不在GitHub可从项目空间获取）
 1. **沙箱写代码** → 编译验证通过（铁律：编译是唯一真相）
-2. **沙箱上传到项目空间** → 留档备查
-3. **沙箱push到GitHub** → 说了"上传到GitHub"自动执行
+2. **沙箱push到GitHub** → 先保命再留档（铁律：编译通过后先push GitHub，再上传项目空间）
+3. **沙箱上传到项目空间** → 留档备查
 4. **云电脑 git pull** → 增量同步，速度快
 5. **云电脑编译运行** → `ths-service.sh restart` → 验证
 
@@ -88,6 +88,7 @@
 
 ### 沙箱铁律
 - ✅ 写代码、编译验证
+- ✅ 编译通过后**先push GitHub再上传项目空间**（铁律：GitHub是保命线，先保命再留档）
 - ✅ 上传文件到项目空间（coze CLI upload/write）
 - ✅ git push到GitHub（SSH over 443，稳定）
 - ✅ 崩溃/重启后从GitHub拉取代码基线（git clone，唯一代码源）
@@ -238,7 +239,7 @@ cat /root/.cloudflared/config.yml            # 查看隧道配置
 ---
 
 *文档生成时间：2026-06-23 09:38*
-*v2更新时间：2026-06-23 18:45（精确化沙箱基线铁律：代码走GitHub，非代码可走项目空间）*
+*v2更新时间：2026-06-23 23:31（新增铁律：编译通过后先push GitHub再上传项目空间）*
 
 ---
 
