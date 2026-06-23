@@ -303,6 +303,15 @@ public class ThsIndustryPageFetcher {
                 }
                 data.industryName = industryName;
 
+                // 列1: 行业详情页链接（从<a>标签提取href）
+                Elements industryLinks = cells.get(1).select("a[href]");
+                if (!industryLinks.isEmpty()) {
+                    String href = industryLinks.first().attr("href");
+                    if (href != null && !href.isEmpty()) {
+                        data.industryLink = href.startsWith("http") ? href : "http://data.10jqka.com.cn" + href;
+                    }
+                }
+
                 // 列2: 行业指数（跳过）
                 // data.indexValue = cells.get(2).text().trim();
 
@@ -326,6 +335,20 @@ public class ThsIndustryPageFetcher {
                 // 列8: 领涨股
                 if (cells.size() > 8) {
                     data.leadingStock = cells.get(8).text().trim();
+                    // 领涨股链接和代码（从<a>标签提取）
+                    Elements stockLinks = cells.get(8).select("a[href]");
+                    if (!stockLinks.isEmpty()) {
+                        String stockHref = stockLinks.first().attr("href");
+                        if (stockHref != null && !stockHref.isEmpty()) {
+                            data.leadingStockLink = stockHref.startsWith("http") ? stockHref : "http://data.10jqka.com.cn" + stockHref;
+                            // 从URL中提取股票代码（格式如 /stock/600519/ 或包含6位数字）
+                            Pattern stockCodePattern = Pattern.compile("(\\d{6})");
+                            Matcher stockCodeMatcher = stockCodePattern.matcher(stockHref);
+                            if (stockCodeMatcher.find()) {
+                                data.leadingStockCode = stockCodeMatcher.group(1);
+                            }
+                        }
+                    }
                 }
 
                 // 列9: 领涨股涨跌幅（%）
@@ -433,11 +456,14 @@ public class ThsIndustryPageFetcher {
         public LocalDate tradeDate;
         public String industryCode;
         public String industryName;
+        public String industryLink;
         public BigDecimal netAmount;
         public BigDecimal inflowAmount;
         public BigDecimal outflowAmount;
         public BigDecimal industryChangePct;
         public String leadingStock;
+        public String leadingStockCode;
+        public String leadingStockLink;
         public BigDecimal leadingStockPct;
         public int rank;
     }

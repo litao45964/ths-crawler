@@ -26,6 +26,9 @@ public class IndustryFlowDTO {
     /** 行业名称 */
     private String industryName;
 
+    /** 行业详情页URL */
+    private String industryLink;
+
     /** 净额（万元） */
     private BigDecimal netAmount;
 
@@ -40,6 +43,12 @@ public class IndustryFlowDTO {
 
     /** 领涨股 */
     private String leadingStock;
+
+    /** 领涨股代码 */
+    private String leadingStockCode;
+
+    /** 领涨股详情页URL */
+    private String leadingStockLink;
 
     /** 领涨股涨幅（%） */
     private BigDecimal leadingStockPct;
