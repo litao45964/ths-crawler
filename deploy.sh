@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================================
 # ths-crawler 一键部署脚本（云电脑 Ubuntu 22.04）
-# 用法：git clone https://github.com/litao45964/ths-crawler.git
+# 用法：git clone git@github.com:litao45964/ths-crawler.git
 #       cd ths-crawler && chmod +x deploy.sh && ./deploy.sh
 # ============================================================
 

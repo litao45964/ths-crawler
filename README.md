@@ -5,7 +5,7 @@
 ## 一键部署
 
 ```bash
-git clone https://github.com/litao45964/ths-crawler.git
+git clone git@github.com:litao45964/ths-crawler.git
 cd ths-crawler && chmod +x deploy.sh && ./deploy.sh
 ```
 
