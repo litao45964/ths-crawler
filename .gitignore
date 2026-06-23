@@ -1,5 +1,5 @@
 # Java
-backend/target/
+ths-crawler/target/
 *.class
 *.jar
 *.war
@@ -14,8 +14,8 @@ backend/target/
 .classpath
 
 # Node
-frontend/node_modules/
-frontend/dist/
+ths-crawler-ui/node_modules/
+ths-crawler-ui/dist/
 
 # OS
 .DS_Store
@@ -28,3 +28,6 @@ Thumbs.db
 # Python
 __pycache__/
 *.pyc
+
+# Cloudflare credentials
+.cloudflared/
