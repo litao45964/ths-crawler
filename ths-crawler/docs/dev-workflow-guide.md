@@ -41,7 +41,7 @@
 
 ### 推荐开发流程（v2简化版）
 
-0. **沙箱崩溃/重启？** → `git clone git@github.com:litao45964/ths-crawler.git` 从GitHub拉基线（铁律：不从项目空间拼凑）
+0. **沙箱崩溃/重启？** → `git clone git@github.com:litao45964/ths-crawler.git` 从GitHub拉代码基线（铁律：代码不从项目空间拼凑；非代码文件如不在GitHub可从项目空间获取）
 1. **沙箱写代码** → 编译验证通过（铁律：编译是唯一真相）
 2. **沙箱上传到项目空间** → 留档备查
 3. **沙箱push到GitHub** → 说了"上传到GitHub"自动执行
@@ -90,9 +90,10 @@
 - ✅ 写代码、编译验证
 - ✅ 上传文件到项目空间（coze CLI upload/write）
 - ✅ git push到GitHub（SSH over 443，稳定）
-- ✅ 崩溃/重启后从GitHub拉取基线（git clone，唯一代码源）
+- ✅ 崩溃/重启后从GitHub拉取代码基线（git clone，唯一代码源）
 - ❌ 不要跑长期服务（重启丢失）
 - ❌ 不要从项目空间download/read拼凑代码（太慢+缓存问题+版本不确定）
+- ⚠️ 非代码文件（用户上传/纯文档/临时分析）如果不在GitHub里，可从项目空间获取
 
 ### 云电脑铁律
 - ✅ git pull拿代码（SSH over 443，稳定）
@@ -237,7 +238,7 @@ cat /root/.cloudflared/config.yml            # 查看隧道配置
 ---
 
 *文档生成时间：2026-06-23 09:38*
-*v2更新时间：2026-06-23 18:35（新增沙箱基线拉取铁律：只能从GitHub）*
+*v2更新时间：2026-06-23 18:45（精确化沙箱基线铁律：代码走GitHub，非代码可走项目空间）*
 
 ---
 
