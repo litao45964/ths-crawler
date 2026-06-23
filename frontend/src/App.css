@@ -1,0 +1,304 @@
+/* 全局深色金融风格 */
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #0d1520;
+  color: #e8eaf0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'PingFang SC', 'Microsoft YaHei',
+    'Hiragino Sans GB', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+/* Ant Design 深色覆盖 */
+.ant-table {
+  background: transparent !important;
+}
+
+.ant-table-thead > tr > th {
+  background: #141e2e !important;
+  color: #8899aa !important;
+  border-bottom: 1px solid #2a3a4f !important;
+  font-size: 13px;
+}
+
+.ant-table-tbody > tr > td {
+  border-bottom: 1px solid #1e2d45 !important;
+  font-size: 13px;
+}
+
+.ant-table-tbody > tr:hover > td {
+  background: #1e2d45 !important;
+}
+
+.ant-card {
+  border-radius: 8px;
+}
+
+/* 滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d1520;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a3a4f;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3a4f6f;
+}
+
+/* 选择器深色 */
+.ant-select-dropdown {
+  background: #1a2332 !important;
+}
+
+.ant-select-item-option-active {
+  background: #1e2d45 !important;
+}
+
+.ant-select-item-option-selected {
+  background: #1677ff !important;
+}
+
+/* Tabs 深色 */
+.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab {
+  background: #141e2e !important;
+  border-color: #2a3a4f !important;
+}
+
+.ant-tabs-card > .ant-tabs-nav .ant-tabs-tab-active {
+  background: #1a2332 !important;
+  border-bottom-color: #1a2332 !important;
+}
+
+/* Spin 覆盖 */
+.ant-spin-text {
+  color: #8899aa;
+}
+
+/* ==================== 移动端适配 ==================== */
+
+/* 移动端卡片列表项 */
+.mobile-flow-card {
+  background: #1a2332;
+  border: 1px solid #2a3a4f;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.mobile-flow-card .card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.mobile-flow-card .card-header .industry-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #e8eaf0;
+}
+
+.mobile-flow-card .card-header .rank-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  margin-right: 8px;
+}
+
+.mobile-flow-card .card-header .rank-badge.top3 {
+  background: #f5222d;
+  color: #fff;
+}
+
+.mobile-flow-card .card-header .rank-badge.normal {
+  background: #2a3a4f;
+  color: #8899aa;
+}
+
+.mobile-flow-card .card-body {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 0;
+}
+
+.mobile-flow-card .card-body .stat-item {
+  flex: 0 0 50%;
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-flow-card .card-body .stat-item .stat-label {
+  font-size: 11px;
+  color: #8899aa;
+  margin-bottom: 2px;
+}
+
+.mobile-flow-card .card-body .stat-item .stat-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mobile-flow-card .card-footer {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #1e2d45;
+  font-size: 12px;
+  color: #8899aa;
+}
+
+/* 移动端筛选器 */
+.mobile-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.mobile-filter-bar .filter-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.mobile-filter-bar .filter-label {
+  color: #8899aa;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+/* 移动端共振卡片 */
+.mobile-resonance-card {
+  background: #1a2332;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-bottom: 10px;
+}
+
+.mobile-resonance-card .signal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.mobile-resonance-card .signal-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.mobile-resonance-card .signal-stats .stat-item {
+  display: flex;
+  flex-direction: column;
+}
+
+.mobile-resonance-card .signal-stats .stat-label {
+  font-size: 11px;
+  color: #8899aa;
+  margin-bottom: 2px;
+}
+
+.mobile-resonance-card .signal-stats .stat-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* 移动端趋势统计卡片组 */
+.mobile-trend-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.mobile-trend-stats .trend-stat-card {
+  background: #1a2332;
+  border: 1px solid #2a3a4f;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.mobile-trend-stats .trend-stat-card .stat-title {
+  font-size: 12px;
+  color: #8899aa;
+  margin-bottom: 4px;
+}
+
+.mobile-trend-stats .trend-stat-card .stat-value {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.mobile-trend-stats .trend-stat-card .stat-suffix {
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+/* 移动端选择器行 */
+.mobile-selector-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+/* 移动端底部Tab间距补偿 */
+.mobile-bottom-spacer {
+  height: 72px; /* 56px tab + 16px buffer */
+}
+
+/* 移动端触摸优化 */
+@media (max-width: 768px) {
+  .ant-btn {
+    min-height: 40px;
+    padding: 6px 16px;
+  }
+
+  .ant-select-selector {
+    min-height: 40px !important;
+  }
+
+  .ant-select-selection-item {
+    line-height: 32px !important;
+  }
+
+  /* 移动端Tabs滚动 */
+  .ant-tabs-nav {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .ant-tabs-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* 移动端表格横向可滑 */
+  .ant-table-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}

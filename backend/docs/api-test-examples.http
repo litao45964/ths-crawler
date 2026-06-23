@@ -1,0 +1,381 @@
+### ============================================================================
+### ths-crawler API 接口验证示例
+### 格式：IntelliJ HTTP Client (.http)
+### 使用：在 IntelliJ IDEA 中直接打开此文件，点击请求旁的运行按钮即可执行
+###       或使用 VS Code 的 REST Client 插件
+### 环境变量：通过 http-client.env.json 配置，见文件底部
+### ============================================================================
+
+### --------------------------------------------------------------------------
+### 健康检查 - 确认服务是否启动
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/actuator/health
+Accept: application/json
+
+###
+
+### ==========================================================================
+### 板块资金流向 API
+### ==========================================================================
+
+### --------------------------------------------------------------------------
+### 1. 手动触发抓取 - 行业板块资金净流入前3
+###    验证：返回success=true，topN数组长度=3，每项包含boardName/mainNetInflow等字段
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/sector-flow/fetch?type=industry&topN=3
+Accept: application/json
+
+> {%
+    client.test("行业板块抓取成功", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        var body = response.body;
+        client.assert(body.success === true, "success应为true");
+        client.assert(body.topN.length === 3, "topN数组长度应为3");
+        client.assert(body.topN[0].boardName !== undefined, "应包含boardName字段");
+        client.assert(body.topN[0].mainNetInflow !== undefined, "应包含mainNetInflow字段");
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### 2. 手动触发抓取 - 概念板块资金净流入前3
+###    验证：返回success=true，topN数组长度=3
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/sector-flow/fetch?type=concept&topN=3
+Accept: application/json
+
+> {%
+    client.test("概念板块抓取成功", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        var body = response.body;
+        client.assert(body.success === true, "success应为true");
+        client.assert(body.topN.length === 3, "topN数组长度应为3");
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### 3. 手动触发抓取 - 自定义TopN（取前5名）
+###    验证：topN数组长度=5
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/sector-flow/fetch?type=industry&topN=5
+Accept: application/json
+
+> {%
+    client.test("自定义TopN抓取", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        var body = response.body;
+        client.assert(body.success === true, "success应为true");
+        client.assert(body.topN.length === 5, "topN数组长度应为5");
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### 4. 手动触发抓取 - 异常参数测试（无效type）
+###    验证：应返回失败或空数据
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/sector-flow/fetch?type=invalid_type&topN=3
+Accept: application/json
+
+> {%
+    client.test("无效type参数", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        // AKShare会抛异常，Java层应捕获并返回success=false
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### 5. 查询Redis缓存 - 行业板块前3
+###    前提：至少执行过一次抓取（接口1或接口7）
+###    验证：返回JSON数组，每项含rank/boardName/mainNetInflow
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/sector-flow/industry-top3
+Accept: application/json
+
+> {%
+    client.test("行业Top3缓存查询", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        // 首次查询可能返回"暂无数据"提示
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### 6. 查询Redis缓存 - 概念板块前3
+###    前提：至少执行过一次概念板块抓取
+###    验证：返回JSON数组
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/sector-flow/concept-top3
+Accept: application/json
+
+> {%
+    client.test("概念Top3缓存查询", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### 7. 完整日度抓取 + 存储（行业+概念）
+###    这是核心接口：抓取两类板块数据 → 清洗Top3 → 双写Redis+MySQL
+###    验证：返回success=true，industryTop3和conceptTop3各3条
+### --------------------------------------------------------------------------
+POST {{baseUrl}}/api/sector-flow/daily
+Accept: application/json
+
+> {%
+    client.test("日度抓取+存储", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        var body = response.body;
+        client.assert(body.success === true, "success应为true");
+        client.assert(body.industryTop3 !== undefined, "应包含industryTop3");
+        client.assert(body.conceptTop3 !== undefined, "应包含conceptTop3");
+    });
+
+    // 抓取完成后再次查缓存验证
+    client.log("日度抓取完成，建议再次调用接口5和6验证缓存数据");
+%}
+
+###
+
+### ==========================================================================
+### 预期返回结构参考
+### ==========================================================================
+
+### 接口1 返回示例：
+# {
+#   "success": true,
+#   "type": "industry",
+#   "topN": [
+#     {
+#       "rank": 1,
+#       "boardName": "半导体",
+#       "boardType": "industry",
+#       "changePercent": 2.350,
+#       "mainNetInflow": 1580000000.00,
+#       "mainInflow": 2350000000.00,
+#       "mainOutflow": 770000000.00,
+#       "leadStock": "中芯国际",
+#       "leadChangePercent": 5.230,
+#       "upCount": 45,
+#       "downCount": 12
+#     },
+#     { "rank": 2, "boardName": "消费电子", ... },
+#     { "rank": 3, "boardName": "新能源车", ... }
+#   ],
+#   "totalCount": 86,
+#   "costMs": 3200
+# }
+
+### 接口5/6 返回示例（Redis缓存）：
+# [
+#   {
+#     "rank": 1,
+#     "boardName": "半导体",
+#     "boardType": "industry",
+#     "changePercent": 2.350,
+#     "mainNetInflow": 1580000000.00,
+#     "leadStock": "中芯国际",
+#     "upCount": 45,
+#     "downCount": 12
+#   },
+#   ...
+# ]
+
+### 接口7 返回示例：
+# {
+#   "success": true,
+#   "industryTop3": [ { "rank": 1, "boardName": "半导体", ... }, ... ],
+#   "conceptTop3": [ { "rank": 1, "boardName": "ChatGPT", ... }, ... ]
+# }
+
+### ==========================================================================
+### cURL 等价命令（用于终端快速验证）
+### ==========================================================================
+
+### 行业板块抓取
+# curl -s "http://localhost:8100/api/sector-flow/fetch?type=industry&topN=3" | python3 -m json.tool
+
+### 概念板块抓取
+# curl -s "http://localhost:8100/api/sector-flow/fetch?type=concept&topN=3" | python3 -m json.tool
+
+### 日度完整抓取+存储
+# curl -s -X POST "http://localhost:8100/api/sector-flow/daily" | python3 -m json.tool
+
+### 查行业缓存
+# curl -s "http://localhost:8100/api/sector-flow/industry-top3" | python3 -m json.tool
+
+### 查概念缓存
+# curl -s "http://localhost:8100/api/sector-flow/concept-top3" | python3 -m json.tool
+
+### Redis 直接查看Key
+# redis-cli GET "ths:latest:sector_capital_flow:industry_top3"
+# redis-cli GET "ths:latest:sector_capital_flow:concept_top3"
+# redis-cli KEYS "ths:*"
+
+### MySQL 查询验证
+# mysql -uroot -proot ths_crawler -e "SELECT * FROM ths_sector_capital_flow ORDER BY trade_date DESC LIMIT 10;"
+# mysql -uroot -proot ths_crawler -e "SELECT * FROM ths_crawl_log ORDER BY created_at DESC LIMIT 10;"
+
+### Python脚本独立测试
+# python3 scripts/fetch_sector_flow.py --type industry | python3 -m json.tool
+# python3 scripts/fetch_sector_flow.py --type concept | python3 -m json.tool
+
+
+### ==========================================================================
+### 行业资金流向 V2 API（OkHttp直连同花顺页面）
+### ==========================================================================
+
+### --------------------------------------------------------------------------
+### V2-1. 手动触发日度采集（行业一二页全量抓取）
+###    验证：返回success=true，totalRows约40条
+### --------------------------------------------------------------------------
+POST {{baseUrl}}/api/industry-flow/collect
+Accept: application/json
+
+> {%
+    client.test("V2日度采集", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        var body = response.body;
+        client.assert(body.success === true, "success应为true");
+        client.assert(body.totalRows > 0, "totalRows应大于0");
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### V2-2. 手动补采指定日期
+###    注意：同花顺页面仅提供当天数据，补采实际走当天采集
+### --------------------------------------------------------------------------
+POST {{baseUrl}}/api/industry-flow/collect/2026-06-18
+Accept: application/json
+
+###
+
+### --------------------------------------------------------------------------
+### V2-3. 查询最新日度排行（默认Top10，按净额降序）
+###    验证：返回success=true，data数组含industryName/netAmount等字段
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/industry-flow/latest?topN=10&orderBy=net_amount
+Accept: application/json
+
+> {%
+    client.test("V2最新排行", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        var body = response.body;
+        client.assert(body.success === true, "success应为true");
+        client.assert(body.data.length > 0, "data不应为空");
+        client.assert(body.data[0].industryName !== undefined, "应含industryName");
+        client.assert(body.data[0].netAmount !== undefined, "应含netAmount");
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### V2-4. 查询最新排行（按涨跌幅排序，取Top20）
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/industry-flow/latest?topN=20&orderBy=industry_change_pct
+Accept: application/json
+
+###
+
+### --------------------------------------------------------------------------
+### V2-5. 查询行业名称列表（前端选择器用）
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/industry-flow/industries
+Accept: application/json
+
+###
+
+### --------------------------------------------------------------------------
+### V2-6. 查询单行业趋势统计
+###    验证：返回trendSlope/rSquared/sampleCount等趋势指标
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/industry-flow/trend?industry=半导体&period=22
+Accept: application/json
+
+> {%
+    client.test("V2趋势查询", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        var body = response.body;
+        client.assert(body.success === true, "success应为true");
+        client.assert(body.industry === "半导体", "industry应为半导体");
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### V2-7. 查询单行业历史净额序列（趋势折线图用）
+###    验证：返回按日期排列的净额序列
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/industry-flow/history?industry=半导体&days=60
+Accept: application/json
+
+###
+
+### --------------------------------------------------------------------------
+### V2-8. 长短周期共振信号（默认短5长22）
+###    验证：返回BULLISH_RESONANCE等4种信号类型
+### --------------------------------------------------------------------------
+GET {{baseUrl}}/api/industry-flow/resonance?shortPeriod=5&longPeriod=22
+Accept: application/json
+
+> {%
+    client.test("V2共振信号", function() {
+        client.assert(response.status === 200, "HTTP状态码应为200");
+        var body = response.body;
+        client.assert(body.success === true, "success应为true");
+        client.assert(body.data !== undefined, "应含data");
+    });
+%}
+
+###
+
+### --------------------------------------------------------------------------
+### V2-9. 手动触发趋势计算
+###    验证：计算全行业6个周期的趋势统计并入库
+### --------------------------------------------------------------------------
+POST {{baseUrl}}/api/industry-flow/trend/calculate
+Accept: application/json
+
+###
+
+### ==========================================================================
+### V2 cURL 等价命令
+### ==========================================================================
+
+### V2日度采集
+# curl -s -X POST "http://localhost:8100/api/industry-flow/collect" | python3 -m json.tool
+
+### V2最新排行
+# curl -s "http://localhost:8100/api/industry-flow/latest?topN=10&orderBy=net_amount" | python3 -m json.tool
+
+### V2行业列表
+# curl -s "http://localhost:8100/api/industry-flow/industries" | python3 -m json.tool
+
+### V2趋势查询
+# curl -s "http://localhost:8100/api/industry-flow/trend?industry=半导体&period=22" | python3 -m json.tool
+
+### V2历史净额
+# curl -s "http://localhost:8100/api/industry-flow/history?industry=半导体&days=60" | python3 -m json.tool
+
+### V2共振信号
+# curl -s "http://localhost:8100/api/industry-flow/resonance?shortPeriod=5&longPeriod=22" | python3 -m json.tool
+
+### V2趋势计算
+# curl -s -X POST "http://localhost:8100/api/industry-flow/trend/calculate" | python3 -m json.tool
+
+### V2 MySQL 查询验证
+# mysql -uroot -proot ths_crawler -e "SELECT * FROM industry_capital_flow ORDER BY trade_date DESC, net_amount DESC LIMIT 20;"
+# mysql -uroot -proot ths_crawler -e "SELECT * FROM industry_trend_stat ORDER BY trade_date DESC LIMIT 20;"

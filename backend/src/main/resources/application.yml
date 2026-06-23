@@ -1,0 +1,70 @@
+server:
+  port: 8100
+
+spring:
+  datasource:
+    url: jdbc:mysql://localhost:3306/ths_crawler?useSSL=false&characterEncoding=utf8&allowPublicKeyRetrieval=true
+    username: root
+    password: ${MYSQL_PASSWORD:root}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+mybatis-plus:
+  mapper-locations: classpath*:/mapper/**/*.xml
+  global-config:
+    db-config:
+      id-type: auto
+
+# ===== 同花顺爬虫配置 =====
+ths:
+  # 数据源切换：akshare(当前) / okhttp(后续)
+  fetcher:
+    sector-flow: akshare
+
+  # AKShare配置
+  akshare:
+    python-path: python3
+    script-path: scripts/fetch_sector_flow.py
+    timeout: 60
+
+  # OkHttp配置（V2新增）
+  okhttp:
+    connect-timeout: 10
+    read-timeout: 30
+    retry-count: 3
+    request-delay-min: 500
+    request-delay-max: 1500
+
+  # 趋势计算配置（V2新增）
+  trend:
+    # 有效样本最低比例（周期 × 0.8）
+    min-sample-ratio: 0.8
+    # R²过滤阈值
+    r-squared-threshold: 0.4
+
+  # 定时任务Cron（默认工作日15:30收盘后执行）
+  cron:
+    sector-capital-flow: "0 30 15 ? * MON-FRI"
+    # V2新增：行业资金采集 / 趋势计算 / 异动信号 / 数据校验
+    industry-flow-collect: "0 30 15 ? * MON-FRI"
+    industry-trend-calc: "0 30 16 ? * MON-FRI"
+    industry-anomaly-signal: "0 0 17 ? * MON-FRI"
+    industry-data-verify: "0 0 9 ? * MON-FRI"
+
+  # Redis TTL配置（天）
+  redis:
+    raw-ttl: 7
+    clean-ttl: 30
+
+  # 存储配置
+  storage:
+    async-pool-size: 4
+    save-raw-json: true
+
+logging:
+  level:
+    com.ths.crawler: DEBUG

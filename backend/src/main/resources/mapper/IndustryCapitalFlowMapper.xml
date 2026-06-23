@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ths.crawler.mapper.IndustryCapitalFlowMapper">
+
+    <resultMap id="BaseResultMap" type="com.ths.crawler.model.entity.IndustryCapitalFlowEntity">
+        <id column="id" property="id"/>
+        <result column="trade_date" property="tradeDate"/>
+        <result column="industry_code" property="industryCode"/>
+        <result column="industry_name" property="industryName"/>
+        <result column="net_amount" property="netAmount"/>
+        <result column="inflow_amount" property="inflowAmount"/>
+        <result column="outflow_amount" property="outflowAmount"/>
+        <result column="industry_change_pct" property="industryChangePct"/>
+        <result column="leading_stock" property="leadingStock"/>
+        <result column="leading_stock_pct" property="leadingStockPct"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, trade_date, industry_code, industry_name, net_amount, inflow_amount,
+        outflow_amount, industry_change_pct, leading_stock, leading_stock_pct,
+        created_at, updated_at
+    </sql>
+
+    <!-- 批量插入或更新 -->
+    <insert id="batchInsertOrUpdate" parameterType="java.util.List">
+        INSERT INTO industry_capital_flow
+            (trade_date, industry_code, industry_name, net_amount, inflow_amount,
+             outflow_amount, industry_change_pct, leading_stock, leading_stock_pct)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.tradeDate}, #{item.industryCode}, #{item.industryName},
+             #{item.netAmount}, #{item.inflowAmount}, #{item.outflowAmount},
+             #{item.industryChangePct}, #{item.leadingStock}, #{item.leadingStockPct})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            industry_code = VALUES(industry_code),
+            net_amount = VALUES(net_amount),
+            inflow_amount = VALUES(inflow_amount),
+            outflow_amount = VALUES(outflow_amount),
+            industry_change_pct = VALUES(industry_change_pct),
+            leading_stock = VALUES(leading_stock),
+            leading_stock_pct = VALUES(leading_stock_pct),
+            updated_at = NOW()
+    </insert>
+
+    <!-- 查询指定日期的所有行业数据 -->
+    <select id="selectByTradeDate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM industry_capital_flow
+        WHERE trade_date = #{tradeDate}
+        ORDER BY net_amount DESC
+    </select>
+
+    <!-- 查询指定行业在日期范围内的数据 -->
+    <select id="selectByIndustryAndDateRange" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM industry_capital_flow
+        WHERE industry_name = #{industryName}
+          AND trade_date BETWEEN #{startDate} AND #{endDate}
+        ORDER BY trade_date ASC
+    </select>
+
+    <!-- 查询最新交易日期 -->
+    <select id="selectLatestTradeDate" resultType="java.time.LocalDate">
+        SELECT MAX(trade_date)
+        FROM industry_capital_flow
+    </select>
+
+</mapper>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ths.crawler.mapper.IndustryTrendStatMapper">
+
+    <resultMap id="BaseResultMap" type="com.ths.crawler.model.entity.IndustryTrendStatEntity">
+        <id column="id" property="id"/>
+        <result column="trade_date" property="tradeDate"/>
+        <result column="industry_name" property="industryName"/>
+        <result column="stat_period" property="statPeriod"/>
+        <result column="sample_count" property="sampleCount"/>
+        <result column="trend_slope" property="trendSlope"/>
+        <result column="intercept" property="intercept"/>
+        <result column="r_squared" property="rSquared"/>
+        <result column="total_net_amount" property="totalNetAmount"/>
+        <result column="avg_net_amount" property="avgNetAmount"/>
+        <result column="std_net_amount" property="stdNetAmount"/>
+        <result column="min_net_amount" property="minNetAmount"/>
+        <result column="max_net_amount" property="maxNetAmount"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, trade_date, industry_name, stat_period, sample_count, trend_slope,
+        intercept, r_squared, total_net_amount, avg_net_amount, std_net_amount,
+        min_net_amount, max_net_amount, created_at, updated_at
+    </sql>
+
+    <!-- 批量插入或更新 -->
+    <insert id="batchInsertOrUpdate" parameterType="java.util.List">
+        INSERT INTO industry_trend_stat
+            (trade_date, industry_name, stat_period, sample_count, trend_slope,
+             intercept, r_squared, total_net_amount, avg_net_amount, std_net_amount,
+             min_net_amount, max_net_amount)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.tradeDate}, #{item.industryName}, #{item.statPeriod}, #{item.sampleCount},
+             #{item.trendSlope}, #{item.intercept}, #{item.rSquared},
+             #{item.totalNetAmount}, #{item.avgNetAmount}, #{item.stdNetAmount},
+             #{item.minNetAmount}, #{item.maxNetAmount})
+        </foreach>
+        ON DUPLICATE KEY UPDATE
+            sample_count = VALUES(sample_count),
+            trend_slope = VALUES(trend_slope),
+            intercept = VALUES(intercept),
+            r_squared = VALUES(r_squared),
+            total_net_amount = VALUES(total_net_amount),
+            avg_net_amount = VALUES(avg_net_amount),
+            std_net_amount = VALUES(std_net_amount),
+            min_net_amount = VALUES(min_net_amount),
+            max_net_amount = VALUES(max_net_amount),
+            updated_at = NOW()
+    </insert>
+
+    <!-- 查询指定行业在日期范围内的趋势数据 -->
+    <select id="selectByIndustryAndDateRange" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM industry_trend_stat
+        WHERE industry_name = #{industryName}
+          AND trade_date BETWEEN #{startDate} AND #{endDate}
+        ORDER BY trade_date ASC, stat_period ASC
+    </select>
+
+    <!-- 查询指定行业、日期、周期的趋势数据 -->
+    <select id="selectByIndustryDatePeriod" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM industry_trend_stat
+        WHERE industry_name = #{industryName}
+          AND trade_date = #{tradeDate}
+          AND stat_period = #{statPeriod}
+    </select>
+
+    <!-- 查询指定日期和周期的所有行业趋势 -->
+    <select id="selectByDateAndPeriod" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM industry_trend_stat
+        WHERE trade_date = #{tradeDate}
+          AND stat_period = #{statPeriod}
+        ORDER BY trend_slope DESC
+    </select>
+
+    <!-- 查询所有不重复的行业名称 -->
+    <select id="selectDistinctIndustries" resultType="java.lang.String">
+        SELECT DISTINCT industry_name
+        FROM industry_trend_stat
+        ORDER BY industry_name
+    </select>
+
+    <!-- 查询指定日期所有行业的趋势数据 -->
+    <select id="selectByTradeDate" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM industry_trend_stat
+        WHERE trade_date = #{tradeDate}
+        ORDER BY stat_period ASC, trend_slope DESC
+    </select>
+
+</mapper>
