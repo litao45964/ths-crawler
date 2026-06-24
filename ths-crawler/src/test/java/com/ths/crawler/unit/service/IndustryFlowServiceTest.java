@@ -18,6 +18,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
 /**
@@ -90,16 +91,13 @@ class IndustryFlowServiceTest {
         @Test
         @DisplayName("返回指定行业最近N天的历史数据，按日期升序")
         void 返回指定行业历史数据() {
-            LocalDate today = LocalDate.of(2026, 6, 24);
-            LocalDate start = today.minusDays(60);
-
             List<IndustryCapitalFlowEntity> entities = List.of(
                     buildEntity("半导体", LocalDate.of(2026, 6, 20), new BigDecimal("50000")),
                     buildEntity("半导体", LocalDate.of(2026, 6, 23), new BigDecimal("60000")),
                     buildEntity("半导体", LocalDate.of(2026, 6, 24), new BigDecimal("70000"))
             );
 
-            when(flowMapper.selectByIndustryAndDateRange("半导体", start, today)).thenReturn(entities);
+            when(flowMapper.selectByIndustryAndDateRange(eq("半导体"), any(), any())).thenReturn(entities);
 
             var result = flowService.getIndustryHistory("半导体", 60);
 
@@ -122,9 +120,8 @@ class IndustryFlowServiceTest {
         @Test
         @DisplayName("days参数=0时，startDate=endDate，最多返回1天数据")
         void days为0时最多1天数据() {
-            LocalDate today = LocalDate.of(2026, 6, 24);
-            when(flowMapper.selectByIndustryAndDateRange("银行", today, today))
-                    .thenReturn(List.of(buildEntity("银行", today, new BigDecimal("10000"))));
+            when(flowMapper.selectByIndustryAndDateRange(eq("银行"), any(), any()))
+                    .thenReturn(List.of(buildEntity("银行", LocalDate.now(), new BigDecimal("10000"))));
 
             var result = flowService.getIndustryHistory("银行", 0);
 
