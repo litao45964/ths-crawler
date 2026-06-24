@@ -274,6 +274,9 @@ public class TrendStatService {
         }
 
         List<TrendResonanceDTO> results = Collections.synchronizedList(new ArrayList<>());
+        AtomicInteger skipNullCount = new AtomicInteger(0);
+        AtomicInteger skipR2Count = new AtomicInteger(0);
+        AtomicInteger errorCount2 = new AtomicInteger(0);
 
         industryNames.parallelStream().forEach(industryName -> {
             try {
@@ -283,6 +286,7 @@ public class TrendStatService {
                         industryName, tradeDate, longPeriod);
 
                 if (shortStat == null || longStat == null) {
+                    skipNullCount.incrementAndGet();
                     return;
                 }
 
@@ -291,6 +295,7 @@ public class TrendStatService {
                 double longRSq = longStat.getRSquared() != null ? longStat.getRSquared().doubleValue() : 0;
 
                 if (shortRSq < rSquaredThreshold || longRSq < rSquaredThreshold) {
+                    skipR2Count.incrementAndGet();
                     return;
                 }
 
@@ -333,9 +338,14 @@ public class TrendStatService {
                 results.add(dto);
 
             } catch (Exception e) {
+                errorCount2.incrementAndGet();
                 log.error("共振信号计算异常: industry={}", industryName, e);
             }
         });
+
+        log.info("共振信号计算详情: total={}, skipNull={}, skipR2={}, error={}, pass={}",
+                industryNames.size(), skipNullCount.get(), skipR2Count.get(),
+                errorCount2.get(), results.size());
 
         // 按信号类型排序：做多信号优先
         results.sort((a, b) -> {
