@@ -50,4 +50,11 @@ public interface IndustryCapitalFlowMapper extends BaseMapper<IndustryCapitalFlo
      * @return 最新交易日期
      */
     LocalDate selectLatestTradeDate();
+
+    /**
+     * 查询所有去重的行业名称
+     *
+     * @return 行业名称列表（按名称排序）
+     */
+    List<String> selectDistinctIndustryNames();
 }

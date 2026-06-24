@@ -157,6 +157,43 @@ public class IndustryFlowController {
     }
 
     /**
+     * 查询行业名称列表
+     * GET /api/industry-flow/industries
+     */
+    @GetMapping("/industries")
+    public String getIndustries() {
+        log.info("查询行业名称列表");
+        List<String> names = flowService.getIndustryNames();
+        return JSON.toJSONString(Map.of(
+                "success", true,
+                "data", names,
+                "count", names.size()
+        ));
+    }
+
+    /**
+     * 查询单行业历史净额序列
+     * GET /api/industry-flow/history?industry=半导体&days=60
+     *
+     * @param industry 行业名称
+     * @param days     回看天数（默认60）
+     */
+    @GetMapping("/history")
+    public String getHistory(
+            @RequestParam String industry,
+            @RequestParam(defaultValue = "60") Integer days) {
+        log.info("查询行业历史: industry={}, days={}", industry, days);
+        List<IndustryFlowDTO> list = flowService.getIndustryHistory(industry, days);
+        return JSON.toJSONString(Map.of(
+                "success", true,
+                "industry", industry,
+                "days", days,
+                "data", list,
+                "count", list.size()
+        ));
+    }
+
+    /**
      * 触发趋势计算（手动）
      * POST /api/industry-flow/trend/calculate
      */

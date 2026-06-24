@@ -76,4 +76,11 @@
         FROM industry_capital_flow
     </select>
 
+    <!-- 查询所有去重的行业名称 -->
+    <select id="selectDistinctIndustryNames" resultType="java.lang.String">
+        SELECT DISTINCT industry_name
+        FROM industry_capital_flow
+        ORDER BY industry_name ASC
+    </select>
+
 </mapper>

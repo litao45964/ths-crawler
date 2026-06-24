@@ -191,4 +191,14 @@ public class IndustryFlowService {
                     .build();
         }
     }
+
+    /**
+     * 获取所有去重的行业名称列表
+     *
+     * @return 行业名称列表
+     */
+    public List<String> getIndustryNames() {
+        List<String> names = flowMapper.selectDistinctIndustryNames();
+        return names != null ? names : List.of();
+    }
 }
