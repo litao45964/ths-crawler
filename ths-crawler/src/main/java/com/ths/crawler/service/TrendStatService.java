@@ -50,7 +50,7 @@ public class TrendStatService {
     @Value("${ths.trend.min-sample-ratio:0.8}")
     private double minSampleRatio;
 
-    @Value("${ths.trend.r-squared-threshold:0.4}")
+    @Value("${ths.trend.r-squared-threshold:0.1}")
     private double rSquaredThreshold;
 
     /**
