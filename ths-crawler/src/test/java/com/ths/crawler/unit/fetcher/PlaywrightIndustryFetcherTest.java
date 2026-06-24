@@ -3,6 +3,7 @@ package com.ths.crawler.unit.fetcher;
 import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.ElementHandle;
 import com.microsoft.playwright.Page;
+import com.ths.crawler.config.PlaywrightConfig;
 import com.ths.crawler.core.FetchContext;
 import com.ths.crawler.core.FetchResult;
 import com.ths.crawler.fetcher.playwright.PlaywrightIndustryFetcher;
@@ -25,7 +26,7 @@ import static org.mockito.Mockito.*;
 /**
  * PlaywrightIndustryFetcher 单元测试 — Mock契约测试
  * <p>
- * 策略：Mock Playwright的Browser接口，验证fetch方法的核心控制流程
+ * 策略：Mock PlaywrightConfig.getBrowser()返回Mock Browser，验证fetch方法的核心控制流程
  * 不测试DOM提取细节（依赖真实浏览器渲染，属于集成测试范畴）
  * <p>
  * 重点验证：
@@ -38,6 +39,9 @@ import static org.mockito.Mockito.*;
 class PlaywrightIndustryFetcherTest {
 
     @Mock
+    private PlaywrightConfig playwrightConfig;
+
+    @Mock
     private Browser browser;
 
     @Mock(lenient = true)
@@ -47,7 +51,8 @@ class PlaywrightIndustryFetcherTest {
 
     @BeforeEach
     void setUp() {
-        fetcher = new PlaywrightIndustryFetcher(browser);
+        when(playwrightConfig.getBrowser()).thenReturn(browser);
+        fetcher = new PlaywrightIndustryFetcher(playwrightConfig);
         setField(fetcher, "targetUrl", "http://data.10jqka.com.cn/funds/hyzjl/");
         setField(fetcher, "maxPages", 1);          // 测试只跑1页
         setField(fetcher, "pageWaitMs", 50);
