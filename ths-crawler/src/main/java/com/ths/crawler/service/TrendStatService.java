@@ -273,12 +273,14 @@ public class TrendStatService {
                     .collect(Collectors.toList());
         }
 
-        List<TrendResonanceDTO> results = Collections.synchronizedList(new ArrayList<>());
+        List<TrendResonanceDTO> results = new ArrayList<>();
         AtomicInteger skipNullCount = new AtomicInteger(0);
         AtomicInteger skipR2Count = new AtomicInteger(0);
         AtomicInteger errorCount2 = new AtomicInteger(0);
 
-        industryNames.parallelStream().forEach(industryName -> {
+        log.info("共振计算参数: rSquaredThreshold={}, tradeDate={}", rSquaredThreshold, tradeDate);
+
+        for (String industryName : industryNames) {
             try {
                 IndustryTrendStatEntity shortStat = trendMapper.selectByIndustryDatePeriod(
                         industryName, tradeDate, shortPeriod);
@@ -287,7 +289,7 @@ public class TrendStatService {
 
                 if (shortStat == null || longStat == null) {
                     skipNullCount.incrementAndGet();
-                    return;
+                    continue;
                 }
 
                 // R²过滤
@@ -296,7 +298,9 @@ public class TrendStatService {
 
                 if (shortRSq < rSquaredThreshold || longRSq < rSquaredThreshold) {
                     skipR2Count.incrementAndGet();
-                    return;
+                    log.debug("R²过滤跳过: industry={}, shortR2={}, longR2={}, threshold={}",
+                            industryName, shortRSq, longRSq, rSquaredThreshold);
+                    continue;
                 }
 
                 double shortSlope = shortStat.getTrendSlope() != null ? shortStat.getTrendSlope().doubleValue() : 0;
@@ -341,7 +345,7 @@ public class TrendStatService {
                 errorCount2.incrementAndGet();
                 log.error("共振信号计算异常: industry={}", industryName, e);
             }
-        });
+        }
 
         log.info("共振信号计算详情: total={}, skipNull={}, skipR2={}, error={}, pass={}",
                 industryNames.size(), skipNullCount.get(), skipR2Count.get(),
