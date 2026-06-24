@@ -31,8 +31,9 @@ mybatis-plus:
 
 # ===== 同花顺爬虫配置 =====
 ths:
-  # 数据源切换：akshare(当前) / okhttp(后续)
+  # 数据源切换：playwright(当前-推荐) / okhttp(已失效-401) / akshare(已损坏)
   fetcher:
+    impl: playwright
     sector-flow: akshare
 
   # AKShare配置
@@ -41,13 +42,23 @@ ths:
     script-path: scripts/fetch_sector_flow.py
     timeout: 60
 
-  # OkHttp配置（V2新增）
+  # OkHttp配置（已失效-401，保留备用）
   okhttp:
     connect-timeout: 10
     read-timeout: 30
     retry-count: 3
     request-delay-min: 500
     request-delay-max: 1500
+
+  # Playwright浏览器自动化配置（P0-01）
+  playwright:
+    url: "http://data.10jqka.com.cn/funds/hyzjl/"
+    headless: true              # 云电脑无GUI，必须headless
+    timeout: 30000              # 页面加载超时(ms)
+    page-wait-ms: 2000          # 翻页后等待DOM渲染(ms)
+    max-pages: 4                # 最大翻页数（4页≈90行业）
+    max-retry: 3                # 单页最大重试次数
+    retry-delay-base: 1000      # 退避基数(ms)
 
   # 趋势计算配置（V2新增）
   trend:
