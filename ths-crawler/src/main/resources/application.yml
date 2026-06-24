@@ -64,8 +64,8 @@ ths:
   trend:
     # 有效样本最低比例（周期 × 0.8）
     min-sample-ratio: 0.8
-    # R²过滤阈值
-    r-squared-threshold: 0.4
+    # R²过滤阈值（模拟数据R²普遍偏低，真实数据可调高到0.3-0.4）
+    r-squared-threshold: 0.1
 
   # 定时任务Cron（默认工作日15:30收盘后执行）
   cron:
