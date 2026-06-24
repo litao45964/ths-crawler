@@ -88,16 +88,43 @@ public class IndustryFlowController {
             @RequestParam String industry,
             @RequestParam(defaultValue = "22") Integer period) {
         log.info("查询行业趋势: industry={}, period={}", industry, period);
-        LocalDate latestDate = trendMapper.selectByIndustryAndDateRange(industry,
-                LocalDate.now().minusDays(1), LocalDate.now())
-                .stream().findFirst()
-                .map(IndustryTrendStatEntity::getTradeDate)
-                .orElse(null);
-        if (latestDate == null) {
-            // 尝试从flow表获取最新日期
-            latestDate = LocalDate.now();
+
+        // 先从trend_stat表查找最新数据
+        LocalDate latestDate = null;
+        List<IndustryTrendStatEntity> recentStats = trendMapper.selectByIndustryAndDateRange(industry,
+                LocalDate.now().minusDays(60), LocalDate.now());
+        if (!recentStats.isEmpty()) {
+            latestDate = recentStats.get(recentStats.size() - 1).getTradeDate();
         }
+
+        // trend_stat无数据时，从flow表获取最新交易日
+        if (latestDate == null) {
+            latestDate = flowService.getLatestFlow(1, "net_amount")
+                    .stream().findFirst()
+                    .map(IndustryFlowDTO::getTradeDate)
+                    .orElse(null);
+        }
+
+        if (latestDate == null) {
+            return JSON.toJSONString(Map.of(
+                    "success", false,
+                    "error", "无可用数据",
+                    "industry", industry,
+                    "period", period
+            ));
+        }
+
         IndustryTrendStatEntity stat = trendMapper.selectByIndustryDatePeriod(industry, latestDate, period);
+        if (stat == null) {
+            return JSON.toJSONString(Map.of(
+                    "success", false,
+                    "error", "该行业无趋势统计数据，请先执行趋势计算 POST /api/industry-flow/trend/calculate",
+                    "industry", industry,
+                    "period", period,
+                    "tradeDate", latestDate.toString()
+            ));
+        }
+
         return JSON.toJSONString(Map.of(
                 "success", true,
                 "industry", industry,

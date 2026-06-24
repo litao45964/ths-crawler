@@ -17,6 +17,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
 /**
@@ -80,6 +81,7 @@ public class TrendStatService {
 
         // 3. 并行计算每个行业的所有周期
         List<IndustryTrendStatEntity> allStats = new ArrayList<>();
+        AtomicInteger errorCount = new AtomicInteger(0);
 
         industryNames.parallelStream().forEach(industryName -> {
             try {
@@ -96,9 +98,14 @@ public class TrendStatService {
                     }
                 }
             } catch (Exception e) {
+                errorCount.incrementAndGet();
                 log.error("行业趋势计算异常: industry={}", industryName, e);
             }
         });
+
+        if (errorCount.get() > 0) {
+            log.warn("趋势计算中有{}个行业出现异常", errorCount.get());
+        }
 
         // 4. 批量入库
         int inserted = 0;
@@ -129,7 +136,9 @@ public class TrendStatService {
      */
     public IndustryTrendStatEntity calculateStat(String industryName, LocalDate tradeDate, int period) {
         // 1. 查询历史数据
-        LocalDate startDate = tradeDate.minusDays(period);
+        // 注意：period是交易日数，minusDays用的是自然日，周末/节假日会导致实际交易日不足
+        // 乘以2作为安全系数，确保回溯足够多的自然日来覆盖period个交易日
+        LocalDate startDate = tradeDate.minusDays(Math.max(period * 2, period + 10));
         List<IndustryCapitalFlowEntity> historyData = flowMapper.selectByIndustryAndDateRange(
                 industryName, startDate, tradeDate);
 
