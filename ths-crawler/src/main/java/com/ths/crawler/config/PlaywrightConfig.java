@@ -16,9 +16,9 @@ import jakarta.annotation.PreDestroy;
  * <p>
  * 核心设计：
  * 1. Playwright实例全局单例（重量级资源，一个JVM只创建一次）
- * 2. Browser全局单例（Chromium进程，常驻复用）
- * 3. 每次采集创建新Page，采集完关闭Page（轻量级，隔离cookie/缓存）
- * 4. 应用关闭时@PreDestroy优雅销毁Browser和Playwright
+ * 2. Browser懒加载——首次采集时才创建（避免启动卡住）
+ * 3. 每次采集创建新Page，采集完关闭Page
+ * 4. 应用关闭时@PreDestroy优雅销毁
  * <p>
  * 条件注册：仅当 ths.fetcher.impl=playwright 时激活
  */
@@ -27,50 +27,62 @@ import jakarta.annotation.PreDestroy;
 @Conditional(PlaywrightEnabledCondition.class)
 public class PlaywrightConfig {
 
-    @Value("${ths.playwright.headless:false}")
+    @Value("${ths.playwright.headless:true}")
     private boolean headless;
 
     @Value("${ths.playwright.timeout:30000}")
     private int timeout;
 
-    private Playwright playwright;
+    private volatile Playwright playwright;
+    private volatile Browser browser;
+    private final Object lock = new Object();
 
-    @Bean
-    public Playwright playwrightInstance() {
-        log.info("[Playwright] 初始化Playwright实例, headless={}", headless);
-        this.playwright = Playwright.create();
-        return this.playwright;
-    }
-
-    @Bean(destroyMethod = "close")
-    public Browser playwrightBrowser(Playwright pw) {
-        log.info("[Playwright] 创建Browser实例 (Chromium), headless={}", headless);
-        BrowserType.LaunchOptions options = new BrowserType.LaunchOptions()
-                .setHeadless(headless)
-                .setTimeout(timeout);
-
-        // 云电脑环境可能没有GPU，禁用GPU加速
-        options.setArgs(java.util.List.of(
-                "--disable-gpu",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-extensions",
-                "--disable-background-networking"
-        ));
-
-        return pw.chromium().launch(options);
+    /**
+     * 懒加载获取Browser实例
+     * 首次调用时创建Playwright和Browser，后续复用
+     */
+    public Browser getBrowser() {
+        if (browser == null) {
+            synchronized (lock) {
+                if (browser == null) {
+                    log.info("[Playwright] 懒加载初始化: headless={}", headless);
+                    this.playwright = Playwright.create();
+                    BrowserType.LaunchOptions options = new BrowserType.LaunchOptions()
+                            .setHeadless(headless)
+                            .setTimeout(timeout);
+                    options.setArgs(java.util.List.of(
+                            "--disable-gpu",
+                            "--no-sandbox",
+                            "--disable-dev-shm-usage",
+                            "--disable-extensions",
+                            "--disable-background-networking",
+                            "--disable-blink-features=AutomationControlled"
+                    ));
+                    this.browser = playwright.chromium().launch(options);
+                    log.info("[Playwright] Browser实例创建完成");
+                }
+            }
+        }
+        return browser;
     }
 
     @PreDestroy
     public void close() {
         log.info("[Playwright] 优雅关闭...");
-        if (playwright != null) {
-            try {
-                playwright.close();
-                log.info("[Playwright] 关闭完成");
-            } catch (Exception e) {
-                log.warn("[Playwright] 关闭异常: {}", e.getMessage());
+        try {
+            if (browser != null) {
+                browser.close();
             }
+        } catch (Exception e) {
+            log.warn("[Playwright] Browser关闭异常: {}", e.getMessage());
         }
+        try {
+            if (playwright != null) {
+                playwright.close();
+            }
+        } catch (Exception e) {
+            log.warn("[Playwright] Playwright关闭异常: {}", e.getMessage());
+        }
+        log.info("[Playwright] 关闭完成");
     }
 }

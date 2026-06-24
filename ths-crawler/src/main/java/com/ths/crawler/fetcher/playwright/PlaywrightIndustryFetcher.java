@@ -1,8 +1,8 @@
 package com.ths.crawler.fetcher.playwright;
 
-import com.microsoft.playwright.Browser;
 import com.microsoft.playwright.ElementHandle;
 import com.microsoft.playwright.Page;
+import com.ths.crawler.config.PlaywrightConfig;
 import com.ths.crawler.config.PlaywrightEnabledCondition;
 import com.ths.crawler.core.DataFetcher;
 import com.ths.crawler.core.FetchContext;
@@ -30,7 +30,7 @@ import java.util.regex.Pattern;
  * 页面改版只需改选择器。预期30分钟写脚本，单次可稳定爬50-100页。
  * <p>
  * 核心链路：
- * 1. 导航+等渲染：page.navigate(url) -> waitForSelector -> 浏览器自动执行所有JS
+ * 1. 导航+等渲染：page.navigate(url) -> domcontentloaded -> 等待table出现
  * 2. 分页点击+等待：点击分页按钮后等待DOM重渲染
  * 3. 表格DOM提取：querySelectorAll逐行提取文本+链接
  * 4. 资源控制：Browser全局单例，每次采集新建Page，采集完关闭
@@ -43,7 +43,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowEntity>> {
 
-    private final Browser browser;
+    private final PlaywrightConfig playwrightConfig;
 
     @Value("${ths.playwright.url:http://data.10jqka.com.cn/funds/hyzjl/}")
     private String targetUrl;
@@ -69,6 +69,15 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
     /** 数据源标识 */
     private static final String SOURCE = "industry_capital_flow";
 
+    /** 多种表格选择器（按优先级尝试） */
+    private static final List<String> TABLE_SELECTORS = List.of(
+            "table.table-orbit tbody tr",     // 同花顺新版本
+            "table tbody tr",                  // 标准HTML表格
+            "table.board-table tbody tr",      // board类表格
+            "div.table-body table tbody tr",   // 嵌套结构
+            "table tr"                         // 降级：无tbody
+    );
+
     @Override
     public String getSource() {
         return SOURCE;
@@ -85,18 +94,50 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
 
         Page page = null;
         try {
-            // 1. 创建新Page（隔离cookie/缓存）
-            page = browser.newPage();
+            // 1. 创建新Page
+            page = playwrightConfig.getBrowser().newPage();
             page.setDefaultTimeout(timeout);
 
-            // 2. 导航到目标页面
-            log.info("[traceId={}] 导航到: {}", traceId, targetUrl);
-            page.navigate(targetUrl);
-            page.waitForSelector("table tbody tr",
-                    new Page.WaitForSelectorOptions().setTimeout(timeout));
-            log.info("[traceId={}] 首页渲染完成", traceId);
+            // 反webdriver检测
+            page.addInitScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+            log.info("[traceId={}] 反检测脚本注入完成", traceId);
 
-            // 3. 循环翻页+提取
+            // 2. 导航（用domcontentloaded而非load，更快）
+            log.info("[traceId={}] 导航到: {}", traceId, targetUrl);
+            page.navigate(targetUrl, new Page.NavigateOptions().setWaitUntil(com.microsoft.playwright.options.WaitUntilState.DOMCONTENTLOADED));
+            log.info("[traceId={}] DOM加载完成，等待表格渲染...", traceId);
+
+            // 3. 等待表格出现（尝试多种选择器）
+            boolean tableFound = waitForTable(page, traceId);
+            if (!tableFound) {
+                // 降级：多等5秒再试
+                log.warn("[traceId={}] 表格未即时出现，额外等待5秒...", traceId);
+                page.waitForTimeout(5000);
+                tableFound = waitForTable(page, traceId);
+            }
+
+            if (!tableFound) {
+                // 调试：输出页面信息
+                String title = page.title();
+                String url = page.url();
+                log.error("[traceId={}] 仍未找到表格! title={}, url={}", traceId, title, url);
+                // 调试：输出页面部分内容
+                try {
+                    String bodyText = page.querySelector("body").innerText();
+                    log.error("[traceId={}] 页面body前500字符: {}", traceId,
+                            bodyText != null && bodyText.length() > 500 ? bodyText.substring(0, 500) : bodyText);
+                } catch (Exception e2) {
+                    log.error("[traceId={}] 获取body失败: {}", traceId, e2.getMessage());
+                }
+                // 检查是否有iframe
+                List<ElementHandle> iframes = page.querySelectorAll("iframe");
+                log.error("[traceId={}] iframe数量: {}", traceId, iframes.size());
+                return FetchResult.fail("页面未加载到表格数据, title=" + title);
+            }
+
+            log.info("[traceId={}] 表格渲染完成", traceId);
+
+            // 4. 循环翻页+提取
             List<IndustryCapitalFlowEntity> allData = fetchAllPages(page, traceId);
 
             long costMs = System.currentTimeMillis() - start;
@@ -113,16 +154,31 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
             log.error("[traceId={}] Playwright采集异常, cost={}ms", traceId, costMs, e);
             return FetchResult.fail("采集异常: " + e.getMessage());
         } finally {
-            // 4. 关闭Page释放资源
             if (page != null) {
                 try {
                     page.close();
-                    log.debug("[traceId={}] Page已关闭", traceId);
                 } catch (Exception e) {
                     log.warn("[traceId={}] Page关闭异常: {}", traceId, e.getMessage());
                 }
             }
         }
+    }
+
+    /**
+     * 等待表格出现（尝试多种选择器）
+     */
+    private boolean waitForTable(Page page, String traceId) {
+        for (String selector : TABLE_SELECTORS) {
+            try {
+                page.waitForSelector(selector,
+                        new Page.WaitForSelectorOptions().setTimeout(5000));
+                log.info("[traceId={}] 表格选择器命中: {}", traceId, selector);
+                return true;
+            } catch (Exception e) {
+                log.debug("[traceId={}] 选择器未命中: {}", traceId, selector);
+            }
+        }
+        return false;
     }
 
     /**
@@ -140,7 +196,6 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
                 break;
             }
 
-            // 翻到下一页（非最后一页时）
             if (pageNum < maxPages) {
                 boolean hasNext = clickNextPage(page, pageNum, traceId);
                 if (!hasNext) {
@@ -159,9 +214,7 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
     private List<IndustryCapitalFlowEntity> fetchPageWithRetry(Page page, int pageNum, String traceId) {
         for (int attempt = 1; attempt <= maxRetry; attempt++) {
             try {
-                // 等待DOM渲染
                 page.waitForTimeout(pageWaitMs);
-                waitForDataReady(page);
 
                 List<IndustryCapitalFlowEntity> data = extractTableData(page);
                 if (!data.isEmpty()) {
@@ -175,7 +228,6 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
                         traceId, pageNum, attempt, e.getMessage());
             }
 
-            // 重试前指数退避
             if (attempt < maxRetry) {
                 int delay = (int) Math.pow(2, attempt) * retryDelayBase;
                 log.info("[traceId={}] 第{}页重试等待: {}ms", traceId, pageNum, delay);
@@ -197,10 +249,16 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
      */
     private boolean clickNextPage(Page page, int currentPage, String traceId) {
         try {
-            // 同花顺分页按钮选择器：常见的"下一页"模式
+            // 同花顺分页按钮选择器（多种尝试）
             ElementHandle nextBtn = page.querySelector("a.nextpage");
             if (nextBtn == null) {
-                // 方案2：找页码链接（当前页+1）
+                nextBtn = page.querySelector("li.next a");
+            }
+            if (nextBtn == null) {
+                nextBtn = page.querySelector("a[title='下一页']");
+            }
+            if (nextBtn == null) {
+                // 找页码链接
                 String nextSelector = "a:has-text('" + (currentPage + 1) + "')";
                 nextBtn = page.querySelector(nextSelector);
             }
@@ -221,32 +279,29 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
     }
 
     /**
-     * 等待表格数据渲染就绪
-     */
-    private boolean waitForDataReady(Page page) {
-        try {
-            page.waitForSelector("table tbody tr",
-                    new Page.WaitForSelectorOptions().setTimeout(10000));
-            return true;
-        } catch (Exception e) {
-            log.debug("等待表格数据超时: {}", e.getMessage());
-            return false;
-        }
-    }
-
-    /**
      * 从当前页面提取表格数据
      * <p>
-     * 同花顺行业资金流向表格列：
+     * 同花顺行业资金流向表格列（约10列）：
      * 序号 / 行业 / 行业指数 / 涨跌幅 / 流入资金(亿) / 流出资金(亿) / 净额(亿) / 公司家数 / 领涨股 / 领涨股涨跌幅
      */
     private List<IndustryCapitalFlowEntity> extractTableData(Page page) {
         List<IndustryCapitalFlowEntity> result = new ArrayList<>();
         LocalDate tradeDate = LocalDate.now();
 
-        List<ElementHandle> rows = page.querySelectorAll("table tbody tr");
+        // 尝试多种选择器找到数据行
+        List<ElementHandle> rows = Collections.emptyList();
+        for (String selector : TABLE_SELECTORS) {
+            rows = page.querySelectorAll(selector);
+            if (!rows.isEmpty()) {
+                log.debug("用选择器[{}]提取到{}行", selector, rows.size());
+                break;
+            }
+        }
+
         if (rows.isEmpty()) {
+            // 最后降级：直接找所有table的tr
             rows = page.querySelectorAll("table tr");
+            log.debug("降级选择器提取到{}行", rows.size());
         }
 
         for (ElementHandle row : rows) {
@@ -266,7 +321,7 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
                 }
                 entity.setIndustryName(industryName);
 
-                // 列1: 行业详情页链接（从<a>标签提取href）
+                // 列1: 行业详情页链接
                 List<ElementHandle> industryLinks = cells.get(1).querySelectorAll("a[href]");
                 if (!industryLinks.isEmpty()) {
                     String href = industryLinks.get(0).getAttribute("href");
@@ -275,18 +330,18 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
                     }
                 }
 
-                // 列3: 涨跌幅（%）
+                // 列3: 涨跌幅
                 entity.setIndustryChangePct(parsePercent(cells.get(3).innerText().trim()));
 
-                // 列4: 流入资金（亿）
+                // 列4: 流入资金(亿)
                 BigDecimal inflowYi = parseBigDecimal(cells.get(4).innerText().trim());
                 entity.setInflowAmount(yiToWan(inflowYi));
 
-                // 列5: 流出资金（亿）
+                // 列5: 流出资金(亿)
                 BigDecimal outflowYi = parseBigDecimal(cells.get(5).innerText().trim());
                 entity.setOutflowAmount(yiToWan(outflowYi));
 
-                // 列6: 净额（亿）
+                // 列6: 净额(亿)
                 BigDecimal netYi = parseBigDecimal(cells.get(6).innerText().trim());
                 entity.setNetAmount(yiToWan(netYi));
 
@@ -314,7 +369,6 @@ public class PlaywrightIndustryFetcher implements DataFetcher<List<IndustryCapit
                 }
 
                 entity.setIndustryCode("");
-
                 result.add(entity);
 
             } catch (Exception e) {
