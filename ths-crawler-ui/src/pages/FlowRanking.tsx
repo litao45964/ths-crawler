@@ -137,7 +137,7 @@ export default function FlowRanking() {
       ...darkTheme.xAxis,
       type: 'value' as const,
       axisLabel: {
-        ...darkTheme.xAxis.axisLabel,
+        ...((darkTheme.xAxis as any)?.axisLabel || {}),
         formatter: (v: number) => (v / 10000).toFixed(0) + '亿',
       },
     },
