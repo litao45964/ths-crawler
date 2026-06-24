@@ -63,6 +63,38 @@ java -version 2>&1 | head -1 || echo "❌ 未安装（需 Java 17+）"
 echo -n "Maven: "
 mvn -version 2>/dev/null | head -1 || echo "未安装（可用项目内 ./mvnw 替代）"
 
+# Playwright（采集器核心依赖）
+echo ""
+echo "--- Playwright（采集器核心依赖）---"
+echo -n "Java Playwright依赖: "
+if [ -f "pom.xml" ] && grep -q "com.microsoft.playwright" pom.xml 2>/dev/null; then
+    PW_VER=$(grep -A2 "com.microsoft.playwright" pom.xml | grep "<version>" | head -1 | sed "s/.*<version>//;s/<\/version>.*//" | tr -d "[:space:]")
+    echo "✅ v${PW_VER}"
+else
+    echo "❌ pom.xml中未找到playwright依赖"
+fi
+echo -n "Playwright chromium浏览器: "
+PW_CACHE="${HOME}/.cache/ms-playwright"
+if ls ${PW_CACHE}/chromium-*/INSTALLATION_COMPLETE >/dev/null 2>&1; then
+    CHROMIUM_DIRS=$(ls -d ${PW_CACHE}/chromium-*/ 2>/dev/null)
+    COUNT=$(echo "$CHROMIUM_DIRS" | wc -l)
+    echo "✅ 已安装${COUNT}套"
+    for d in ${CHROMIUM_DIRS}; do
+        VER=$(basename "$d" | sed 's/chromium-//')
+        echo "   chromium-${VER}"
+    done
+else
+    echo "❌ 未安装（执行: npx playwright install chromium）"
+fi
+echo -n "系统Chrome: "
+if which google-chrome >/dev/null 2>&1; then
+    echo "✅ $(google-chrome --version 2>/dev/null)"
+elif which chromium-browser >/dev/null 2>&1; then
+    echo "✅ $(chromium-browser --version 2>/dev/null)"
+else
+    echo "⚠️  未安装（非必须，Playwright自带chromium即可）"
+fi
+
 # 网络（可选）
 echo ""
 echo "--- 网络连通性 ---"
