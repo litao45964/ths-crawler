@@ -1,6 +1,6 @@
 package com.ths.crawler.controller;
 
-import com.alibaba.fastjson2.JSON;
+import com.ths.crawler.model.dto.ApiResponse;
 import com.ths.crawler.model.dto.IndustryFlowDTO;
 import com.ths.crawler.model.dto.TrendResonanceDTO;
 import com.ths.crawler.model.entity.IndustryTrendStatEntity;
@@ -13,7 +13,6 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 
 /**
  * 行业资金流向 V2 API
@@ -39,10 +38,10 @@ public class IndustryFlowController {
      * POST /api/industry-flow/collect
      */
     @PostMapping("/collect")
-    public String collect() {
+    public ApiResponse<IndustryFlowService.CollectResult> collect() {
         log.info("手动触发行业资金流向采集");
         IndustryFlowService.CollectResult result = flowService.collectDailyData();
-        return JSON.toJSONString(result);
+        return ApiResponse.ok(result);
     }
 
     /**
@@ -50,10 +49,10 @@ public class IndustryFlowController {
      * POST /api/industry-flow/collect?date=2026-06-17
      */
     @PostMapping("/collect/{date}")
-    public String manualCollect(@PathVariable String date) {
+    public ApiResponse<IndustryFlowService.CollectResult> manualCollect(@PathVariable String date) {
         log.info("手动补采行业资金流向: date={}", date);
         IndustryFlowService.CollectResult result = flowService.manualCollect(date);
-        return JSON.toJSONString(result);
+        return ApiResponse.ok(result);
     }
 
     /**
@@ -64,16 +63,12 @@ public class IndustryFlowController {
      * @param orderBy 排序字段（net_amount / inflow_amount / outflow_amount / industry_change_pct）
      */
     @GetMapping("/latest")
-    public String getLatest(
+    public ApiResponse<List<IndustryFlowDTO>> getLatest(
             @RequestParam(defaultValue = "10") Integer topN,
             @RequestParam(defaultValue = "net_amount") String orderBy) {
         log.info("查询最新行业资金流向: topN={}, orderBy={}", topN, orderBy);
         List<IndustryFlowDTO> list = flowService.getLatestFlow(topN, orderBy);
-        return JSON.toJSONString(Map.of(
-                "success", true,
-                "data", list,
-                "count", list.size()
-        ));
+        return ApiResponse.ok(list, list.size());
     }
 
     /**
@@ -84,7 +79,7 @@ public class IndustryFlowController {
      * @param period   统计周期（5, 10, 14, 22, 30, 60）
      */
     @GetMapping("/trend")
-    public String getTrend(
+    public ApiResponse<IndustryTrendStatEntity> getTrend(
             @RequestParam String industry,
             @RequestParam(defaultValue = "22") Integer period) {
         log.info("查询行业趋势: industry={}, period={}", industry, period);
@@ -106,32 +101,15 @@ public class IndustryFlowController {
         }
 
         if (latestDate == null) {
-            return JSON.toJSONString(Map.of(
-                    "success", false,
-                    "error", "无可用数据",
-                    "industry", industry,
-                    "period", period
-            ));
+            return ApiResponse.fail("无可用数据");
         }
 
         IndustryTrendStatEntity stat = trendMapper.selectByIndustryDatePeriod(industry, latestDate, period);
         if (stat == null) {
-            return JSON.toJSONString(Map.of(
-                    "success", false,
-                    "error", "该行业无趋势统计数据，请先执行趋势计算 POST /api/industry-flow/trend/calculate",
-                    "industry", industry,
-                    "period", period,
-                    "tradeDate", latestDate.toString()
-            ));
+            return ApiResponse.fail("该行业无趋势统计数据，请先执行趋势计算 POST /api/industry-flow/trend/calculate");
         }
 
-        return JSON.toJSONString(Map.of(
-                "success", true,
-                "industry", industry,
-                "period", period,
-                "tradeDate", latestDate.toString(),
-                "data", stat
-        ));
+        return ApiResponse.ok(stat);
     }
 
     /**
@@ -142,18 +120,12 @@ public class IndustryFlowController {
      * @param longPeriod  长周期（默认22）
      */
     @GetMapping("/resonance")
-    public String getResonance(
+    public ApiResponse<List<TrendResonanceDTO>> getResonance(
             @RequestParam(defaultValue = "5") Integer shortPeriod,
             @RequestParam(defaultValue = "22") Integer longPeriod) {
         log.info("查询共振信号: shortPeriod={}, longPeriod={}", shortPeriod, longPeriod);
         List<TrendResonanceDTO> list = trendService.calculateResonance(shortPeriod, longPeriod);
-        return JSON.toJSONString(Map.of(
-                "success", true,
-                "shortPeriod", shortPeriod,
-                "longPeriod", longPeriod,
-                "data", list,
-                "count", list.size()
-        ));
+        return ApiResponse.ok(list, list.size());
     }
 
     /**
@@ -161,14 +133,10 @@ public class IndustryFlowController {
      * GET /api/industry-flow/industries
      */
     @GetMapping("/industries")
-    public String getIndustries() {
+    public ApiResponse<List<String>> getIndustries() {
         log.info("查询行业名称列表");
         List<String> names = flowService.getIndustryNames();
-        return JSON.toJSONString(Map.of(
-                "success", true,
-                "data", names,
-                "count", names.size()
-        ));
+        return ApiResponse.ok(names, names.size());
     }
 
     /**
@@ -179,18 +147,12 @@ public class IndustryFlowController {
      * @param days     回看天数（默认60）
      */
     @GetMapping("/history")
-    public String getHistory(
+    public ApiResponse<List<IndustryFlowDTO>> getHistory(
             @RequestParam String industry,
             @RequestParam(defaultValue = "60") Integer days) {
         log.info("查询行业历史: industry={}, days={}", industry, days);
         List<IndustryFlowDTO> list = flowService.getIndustryHistory(industry, days);
-        return JSON.toJSONString(Map.of(
-                "success", true,
-                "industry", industry,
-                "days", days,
-                "data", list,
-                "count", list.size()
-        ));
+        return ApiResponse.ok(list, list.size());
     }
 
     /**
@@ -198,9 +160,9 @@ public class IndustryFlowController {
      * POST /api/industry-flow/trend/calculate
      */
     @PostMapping("/trend/calculate")
-    public String calculateTrend() {
+    public ApiResponse<TrendStatService.TrendCalcResult> calculateTrend() {
         log.info("手动触发趋势计算");
         TrendStatService.TrendCalcResult result = trendService.calculateDailyTrendStat();
-        return JSON.toJSONString(result);
+        return ApiResponse.ok(result);
     }
 }

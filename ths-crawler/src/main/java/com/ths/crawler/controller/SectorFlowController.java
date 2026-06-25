@@ -1,9 +1,9 @@
 package com.ths.crawler.controller;
 
-import com.alibaba.fastjson2.JSON;
 import com.ths.crawler.core.DataFetcher;
 import com.ths.crawler.core.FetchContext;
 import com.ths.crawler.core.FetchResult;
+import com.ths.crawler.model.dto.ApiResponse;
 import com.ths.crawler.model.dto.AkshareSectorFlowRawDTO;
 import com.ths.crawler.model.dto.SectorCapitalFlowDTO;
 import com.ths.crawler.model.dto.SectorCapitalFlowDTO.SectorFlowItem;
@@ -37,8 +37,8 @@ public class SectorFlowController {
      * GET /api/sector-flow/fetch?type=industry&topN=3
      */
     @GetMapping("/fetch")
-    public String fetch(@RequestParam(defaultValue = "industry") String type,
-                        @RequestParam(defaultValue = "3") int topN) {
+    public ApiResponse<Map<String, Object>> fetch(@RequestParam(defaultValue = "industry") String type,
+                                                  @RequestParam(defaultValue = "3") int topN) {
         log.info("手动触发抓取: type={}, topN={}", type, topN);
 
         FetchResult<List<AkshareSectorFlowRawDTO>> result = sectorFlowFetcher.fetch(
@@ -49,19 +49,14 @@ public class SectorFlowController {
 
         if (result.isSuccess()) {
             List<SectorFlowItem> topNList = processor.processTopN(result.getData(), type, topN);
-            return JSON.toJSONString(Map.of(
-                    "success", true,
+            return ApiResponse.ok(Map.of(
                     "type", type,
                     "topN", topNList,
                     "totalCount", result.getData().size(),
                     "costMs", result.getCostMs()
             ));
         } else {
-            return JSON.toJSONString(Map.of(
-                    "success", false,
-                    "errorMsg", result.getErrorMsg(),
-                    "costMs", result.getCostMs()
-            ));
+            return ApiResponse.fail(result.getErrorMsg());
         }
     }
 
@@ -70,9 +65,12 @@ public class SectorFlowController {
      * GET /api/sector-flow/industry-top3
      */
     @GetMapping("/industry-top3")
-    public String getIndustryTop3() {
+    public ApiResponse<String> getIndustryTop3() {
         String cached = redisTemplate.opsForValue().get("ths:latest:sector_capital_flow:industry_top3");
-        return cached != null ? cached : "{\"message\": \"暂无数据，请先执行抓取\"}";
+        if (cached != null) {
+            return ApiResponse.ok(cached);
+        }
+        return ApiResponse.fail("暂无数据，请先执行抓取");
     }
 
     /**
@@ -80,9 +78,12 @@ public class SectorFlowController {
      * GET /api/sector-flow/concept-top3
      */
     @GetMapping("/concept-top3")
-    public String getConceptTop3() {
+    public ApiResponse<String> getConceptTop3() {
         String cached = redisTemplate.opsForValue().get("ths:latest:sector_capital_flow:concept_top3");
-        return cached != null ? cached : "{\"message\": \"暂无数据，请先执行抓取\"}";
+        if (cached != null) {
+            return ApiResponse.ok(cached);
+        }
+        return ApiResponse.fail("暂无数据，请先执行抓取");
     }
 
     /**
@@ -90,7 +91,7 @@ public class SectorFlowController {
      * POST /api/sector-flow/daily
      */
     @PostMapping("/daily")
-    public String dailyFetch() {
+    public ApiResponse<Map<String, Object>> dailyFetch() {
         log.info("手动触发日度抓取");
 
         FetchResult<List<AkshareSectorFlowRawDTO>> industryResult = sectorFlowFetcher.fetch(
@@ -114,8 +115,7 @@ public class SectorFlowController {
 
         dualWriteService.writeSectorCapitalFlow(dto, industryResult.getRawJson(), conceptResult.getRawJson());
 
-        return JSON.toJSONString(Map.of(
-                "success", true,
+        return ApiResponse.ok(Map.of(
                 "industryTop3", industryTop3,
                 "conceptTop3", conceptTop3
         ));
