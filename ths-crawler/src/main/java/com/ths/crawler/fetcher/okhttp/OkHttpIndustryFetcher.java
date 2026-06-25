@@ -237,14 +237,16 @@ public class OkHttpIndustryFetcher {
                 browser = playwrightConfig.getBrowser();
             }
             if (browser == null) {
-                // 降级：独立创建 Playwright
+                // 降级：独立创建 Playwright（参照 Selenium 反检测配置）
                 Playwright playwright = Playwright.create();
                 BrowserType.LaunchOptions launchOptions = new BrowserType.LaunchOptions()
                         .setHeadless(true)
                         .setArgs(List.of(
                                 "--no-sandbox", "--disable-dev-shm-usage",
                                 "--disable-gpu", "--window-size=1920,1080",
-                                "--disable-blink-features=AutomationControlled"
+                                "--disable-blink-features=AutomationControlled",
+                                "--disable-features=IsolateOrigins,site-per-process",
+                                "--disable-setuid-sandbox"
                         ));
                 browser = playwright.chromium().launch(launchOptions);
             }
@@ -255,8 +257,12 @@ public class OkHttpIndustryFetcher {
             page = browser.newPage(pageOptions);
             page.setDefaultTimeout(30000);
 
-            // 反 webdriver 检测
-            page.addInitScript("Object.defineProperty(navigator, 'webdriver', {get: () => undefined})");
+            // 反 webdriver 检测（参照 Selenium 方案）
+            page.addInitScript("""
+                Object.defineProperty(navigator, 'webdriver', {get: () => undefined});
+                Object.defineProperty(navigator, 'plugins', {get: () => [1, 2, 3, 4, 5]});
+                Object.defineProperty(navigator, 'languages', {get: () => ['zh-CN', 'zh', 'en']});
+                """);
 
             // 3. 导航到页面
             log.info("🌐 导航到: {}", PAGE_URL);
@@ -264,8 +270,22 @@ public class OkHttpIndustryFetcher {
                     .setWaitUntil(com.microsoft.playwright.options.WaitUntilState.DOMCONTENTLOADED));
             log.info("   DOM 加载完成，等待表格渲染...");
 
-            // 等待表格出现
-            page.waitForSelector("table tbody tr", new Page.WaitForSelectorOptions().setTimeout(15000));
+            // 等待表格出现（多种选择器容错，参照 Selenium 方案）
+            boolean tableFound = false;
+            for (String selector : List.of(
+                    "table tbody tr", "table.m-table tbody tr",
+                    ".J-ajax-table tbody tr", "table tr")) {
+                try {
+                    page.waitForSelector(selector, new Page.WaitForSelectorOptions().setTimeout(10000));
+                    log.info("   选择器命中: {}", selector);
+                    tableFound = true;
+                    break;
+                } catch (Exception ignored) {}
+            }
+            if (!tableFound) {
+                log.warn("⚠️ 表格选择器未命中，等待额外 8 秒...");
+                page.waitForTimeout(8000);
+            }
             page.waitForTimeout(2000);
             log.info("✅ 页面加载完成");
 
