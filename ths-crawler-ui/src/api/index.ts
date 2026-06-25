@@ -8,6 +8,15 @@ const api = axios.create({
 
 // ============ 类型定义 ============
 
+/** 统一API响应格式（与后端 ApiResponse<T> 对应） */
+export interface ApiResponse<T> {
+  success: boolean;
+  data: T;
+  count: number | null;
+  timestamp: number;
+  message: string | null;
+}
+
 export interface IndustryFlowItem {
   tradeDate: string;
   industryCode: string;
@@ -64,7 +73,7 @@ export interface CollectResult {
 
 /** 查询最新日度行业资金流向排行 */
 export async function fetchLatestFlow(topN = 10, orderBy = 'net_amount') {
-  const res = await api.get<{ success: boolean; data: IndustryFlowItem[]; count: number }>(
+  const res = await api.get<ApiResponse<IndustryFlowItem[]>>(
     '/api/industry-flow/latest',
     { params: { topN, orderBy } },
   );
@@ -73,57 +82,46 @@ export async function fetchLatestFlow(topN = 10, orderBy = 'net_amount') {
 
 /** 查询单行业趋势 */
 export async function fetchTrend(industry: string, period = 22) {
-  const res = await api.get<{
-    success: boolean;
-    industry: string;
-    period: number;
-    tradeDate: string;
-    data: TrendData;
-  }>('/api/industry-flow/trend', { params: { industry, period } });
+  const res = await api.get<ApiResponse<TrendData>>(
+    '/api/industry-flow/trend',
+    { params: { industry, period } },
+  );
   return res.data;
 }
 
 /** 长短周期共振信号 */
 export async function fetchResonance(shortPeriod = 5, longPeriod = 22) {
-  const res = await api.get<{
-    success: boolean;
-    shortPeriod: number;
-    longPeriod: number;
-    data: ResonanceItem[];
-    count: number;
-  }>('/api/industry-flow/resonance', { params: { shortPeriod, longPeriod } });
+  const res = await api.get<ApiResponse<ResonanceItem[]>>(
+    '/api/industry-flow/resonance',
+    { params: { shortPeriod, longPeriod } },
+  );
   return res.data;
 }
 
 /** 手动触发日度采集 */
 export async function triggerCollect() {
-  const res = await api.post<CollectResult>('/api/industry-flow/collect');
+  const res = await api.post<ApiResponse<CollectResult>>('/api/industry-flow/collect');
   return res.data;
 }
 
 /** 查询行业名称列表 */
 export async function fetchIndustries() {
-  const res = await api.get<{ success: boolean; data: string[]; count: number }>(
-    '/api/industry-flow/industries',
-  );
+  const res = await api.get<ApiResponse<string[]>>('/api/industry-flow/industries');
   return res.data;
 }
 
 /** 查询单行业历史净额序列 */
 export async function fetchHistory(industry: string, days = 60) {
-  const res = await api.get<{
-    success: boolean;
-    industry: string;
-    days: number;
-    data: IndustryFlowItem[];
-    count: number;
-  }>('/api/industry-flow/history', { params: { industry, days } });
+  const res = await api.get<ApiResponse<IndustryFlowItem[]>>(
+    '/api/industry-flow/history',
+    { params: { industry, days } },
+  );
   return res.data;
 }
 
 /** 手动触发趋势计算 */
 export async function triggerTrendCalculate() {
-  const res = await api.post<{ success: boolean }>('/api/industry-flow/trend/calculate');
+  const res = await api.post<ApiResponse<{ success: boolean }>>('/api/industry-flow/trend/calculate');
   return res.data;
 }
 
