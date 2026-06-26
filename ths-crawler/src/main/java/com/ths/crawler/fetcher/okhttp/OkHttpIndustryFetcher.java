@@ -38,6 +38,10 @@ public class OkHttpIndustryFetcher {
     private int requestDelayMax = 1500;
     private int maxPages = 2;
 
+    // 反重跑保护：5分钟内不重复采集
+    // TODO: 全线跑通后放开 — 当前注释掉避免开发调试时误触发
+    // private long lastFetchTime = 0;
+
     // ============ 正则（参照 Selenium 方案） ============
     /** 行业代码正则：从 URL 中提取 /code/881121/ */
     static final Pattern INDUSTRY_CODE_PAT = Pattern.compile("/code/(\\d+)/");
@@ -208,6 +212,8 @@ public class OkHttpIndustryFetcher {
         String lower = html.toLowerCase();
         return lower.contains("403 forbidden")
                 || lower.contains("429 too many requests")
+                || lower.contains("nginx forbidden")
+                || lower.contains("forbidden")
                 || lower.contains("访问过于频繁")
                 || lower.contains("ip已被封禁")
                 || lower.contains("chameleon");
@@ -223,6 +229,14 @@ public class OkHttpIndustryFetcher {
      * 参照 Selenium 方案的翻页策略：点击按钮 + DOM 指纹检测
      */
     public List<IndustryCapitalFlowEntity> fetch() {
+        // ── 反重跑保护（暂注释，等全线跑通后放开） ──
+        // 原理：5分钟内不重复采集，防止 crontab + 手动触发叠加导致封禁
+        // if (System.currentTimeMillis() - lastFetchTime < 300_000) {
+        //     log.warn("⏰ 距上次采集不足5分钟，跳过本次");
+        //     return Collections.emptyList();
+        // }
+        // lastFetchTime = System.currentTimeMillis();
+
         long start = System.currentTimeMillis();
         log.info("\n" + SEP);
         log.info("  10jqka 行业资金流向 — Playwright 全量抓取");
@@ -286,8 +300,21 @@ public class OkHttpIndustryFetcher {
                 log.warn("⚠️ 表格选择器未命中，等待额外 8 秒...");
                 page.waitForTimeout(8000);
             }
-            page.waitForTimeout(2000);
+
+            // ── 模拟用户浏览：随机等待 3-6 秒（非固定值，避免行为指纹） ──
+            int humanDelay = 3000 + random.nextInt(3000);
+            log.info("⏳ 模拟浏览等待 {}ms...", humanDelay);
+            page.waitForTimeout(humanDelay);
             log.info("✅ 页面加载完成");
+
+            // ── 封禁检测：拿到页面内容先判断是否被封 ──
+            String pageContent = page.content();
+            if (isBlocked(pageContent)) {
+                log.error("❌ 检测到封禁页面！立即终止采集，不重试");
+                log.error("   页面内容头500字:\n{}", pageContent.substring(0, Math.min(500, pageContent.length())));
+                return Collections.emptyList();
+            }
+            log.info("✅ 封禁检测通过");
 
             // 4. 解析第1页
             List<IndustryCapitalFlowEntity> page1 = extractTableData(page);
@@ -391,17 +418,20 @@ public class OkHttpIndustryFetcher {
 
     /**
      * 等待 DOM 变化（参照 Selenium 方案）
+     * 间隔 1000-1500ms（随机抖动），最多查 2 次
      */
     private boolean waitForDomChange(Page page, String oldFp) {
-        for (int i = 0; i < 30; i++) {
+        for (int i = 0; i < 2; i++) {
+            int sleepMs = 1000 + random.nextInt(501); // 1000-1500ms 随机
             try {
-                Thread.sleep(500);
+                Thread.sleep(sleepMs);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 return false;
             }
             String newFp = getFirstRowFingerprint(page);
             if (!newFp.equals(oldFp) && !newFp.isEmpty()) {
+                log.info("   DOM 指纹变化检测到 ({}ms后)", sleepMs);
                 return true;
             }
         }
