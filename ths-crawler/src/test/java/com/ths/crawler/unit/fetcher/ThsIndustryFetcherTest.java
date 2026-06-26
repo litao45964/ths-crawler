@@ -253,17 +253,6 @@ class ThsIndustryFetcherTest {
             assertThat(delay).isBetween(10L, 20L); // 测试配置范围
         }
 
-        @Test
-        @DisplayName("isBlocked检测403/429/封禁关键词")
-        void detectsBlockedResponse() {
-            assertThat(invokeIsBlocked("403 Forbidden")).isTrue();
-            assertThat(invokeIsBlocked("429 Too Many Requests")).isTrue();
-            assertThat(invokeIsBlocked("访问过于频繁")).isTrue();
-            assertThat(invokeIsBlocked("IP已被封禁")).isTrue();
-            assertThat(invokeIsBlocked("chameleon")).isTrue();
-            assertThat(invokeIsBlocked("<html>正常数据</html>")).isFalse();
-            assertThat(invokeIsBlocked("var JS_DATA = [...]")).isFalse();
-        }
     }
 
     // ===================== 反射辅助方法 =====================
@@ -322,15 +311,6 @@ class ThsIndustryFetcherTest {
         }
     }
 
-    private boolean invokeIsBlocked(String html) {
-        try {
-            var method = ThsIndustryFetcher.class.getDeclaredMethod("isBlocked", String.class);
-            method.setAccessible(true);
-            return (boolean) method.invoke(fetcher, html);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     private void setField(Object target, String fieldName, Object value) {
         try {

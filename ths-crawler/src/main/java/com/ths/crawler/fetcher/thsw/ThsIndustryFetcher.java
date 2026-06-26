@@ -220,17 +220,6 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
         return requestDelayMin + random.nextInt(requestDelayMax - requestDelayMin + 1);
     }
 
-    boolean isBlocked(String html) {
-        if (html == null) return true;
-        String lower = html.toLowerCase();
-        return lower.contains("403 forbidden")
-                || lower.contains("429 too many requests")
-                || lower.contains("nginx forbidden")
-                || lower.contains("forbidden")
-                || lower.contains("访问过于频繁")
-                || lower.contains("ip已被封禁")
-                || lower.contains("chameleon");
-    }
 
     // ==================== 核心采集（Playwright，参照 Selenium 方案） ====================
 
@@ -310,7 +299,7 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
 
             // 3. 导航到页面
             log.info("🌐 导航到: {}", PAGE_URL);
-            page.navigate(PAGE_URL, new Page.NavigateOptions()
+            com.microsoft.playwright.Response response = page.navigate(PAGE_URL, new Page.NavigateOptions()
                     .setWaitUntil(com.microsoft.playwright.options.WaitUntilState.DOMCONTENTLOADED));
             log.info("   DOM 加载完成，等待表格渲染...");
 
@@ -337,15 +326,14 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
             page.waitForTimeout(humanDelay);
             log.info("✅ 页面加载完成");
 
-            // ── 封禁检测：拿到页面内容先判断是否被封 ──
-            String pageContent = page.content();
-            if (isBlocked(pageContent)) {
-                log.error("❌ 检测到封禁页面！立即终止采集，不重试");
-                log.error("   页面内容头500字:\n{}", pageContent.substring(0, Math.min(500, pageContent.length())));
+            // ── 封禁检测：用 HTTP 状态码判断 ──
+            int statusCode = response.status();
+            log.info("   HTTP 状态码: {}", statusCode);
+            if (statusCode == 403 || statusCode == 429) {
+                log.error("❌ HTTP {} 封禁！立即终止采集，不重试", statusCode);
                 return Collections.emptyList();
             }
             log.info("✅ 封禁检测通过");
-
             // 4. 解析第1页
             List<IndustryCapitalFlowEntity> page1 = extractTableData(page);
             log.info("📋 第1页: {} 条", page1.size());
@@ -587,10 +575,10 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
     }
 
     private void printStats(List<IndustryCapitalFlowEntity> list, long costMs) {
-        int withCode = (int) list.stream().filter(d -> !d.getIndustryCode().isEmpty()).count();
-        int withLink = (int) list.stream().filter(d -> !d.getIndustryLink().isEmpty()).count();
-        int withSCode = (int) list.stream().filter(d -> !d.getLeadingStockCode().isEmpty()).count();
-        int withSLink = (int) list.stream().filter(d -> !d.getLeadingStockLink().isEmpty()).count();
+        int withCode = (int) list.stream().filter(d -> d.getIndustryCode() != null && !d.getIndustryCode().isEmpty()).count();
+        int withLink = (int) list.stream().filter(d -> d.getIndustryLink() != null && !d.getIndustryLink().isEmpty()).count();
+        int withSCode = (int) list.stream().filter(d -> d.getLeadingStockCode() != null && !d.getLeadingStockCode().isEmpty()).count();
+        int withSLink = (int) list.stream().filter(d -> d.getLeadingStockLink() != null && !d.getLeadingStockLink().isEmpty()).count();
         int total = list.size();
 
         log.info("\n" + SEP);
