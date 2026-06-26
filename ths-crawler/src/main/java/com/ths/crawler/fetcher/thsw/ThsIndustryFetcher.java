@@ -144,7 +144,8 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
                 d.netAmount = parseYi(cells.get(5 + colOffset).text());
 
                 // ── 领涨股 + 链接 + 代码 + 涨幅（Jsoup版）──
-                int stockIdx = 6 + colOffset;
+                // 10/11列格式：领涨股在索引8（8列格式在索引6），比数值列多偏移1列（公司家数）
+                int stockIdx = cells.size() >= 10 ? 8 : 6;
                 if (cells.size() > stockIdx) {
                     org.jsoup.nodes.Element stockCell = cells.get(stockIdx);
                     Elements stLinks = stockCell.select("a");
@@ -523,7 +524,8 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
                 entity.setNetAmount(parseYi(cells.get(5 + colOffset).innerText().trim()));
 
                 // ── 领涨股 + 领涨股链接 + 领涨股代码（参照 Selenium 正则提取）──
-                int stockIdx = 6 + colOffset;
+                // 10/11列格式：领涨股在索引8（8列格式在索引6），比数值列多偏移1列（公司家数）
+                int stockIdx = cells.size() >= 10 ? 8 : 6;
                 if (cells.size() > stockIdx) {
                     List<ElementHandle> stockLinks = cells.get(stockIdx).querySelectorAll("a");
                     if (!stockLinks.isEmpty()) {
@@ -625,9 +627,14 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
      */
     private void saveRawHtml(Page page, int pageNum) {
         try {
-            String tableHtml = (String) page.evaluate(
-                "document.querySelector('table') ? document.querySelector('table').outerHTML : ''");
-            if (tableHtml == null || tableHtml.isEmpty()) {
+            // 用 page.content() 获取完整渲染后的 HTML（含 AJAX 动态加载的 tbody）
+            String fullHtml = page.content();
+            // 提取表格片段：找 <table 开头到 </table> 结尾
+            int tableStart = fullHtml.indexOf("<table");
+            int tableEnd = fullHtml.lastIndexOf("</table>");
+            String tableHtml = (tableStart >= 0 && tableEnd > tableStart)
+                    ? fullHtml.substring(tableStart, tableEnd + 8) : "";
+            if (tableHtml.isEmpty()) {
                 log.warn("未找到表格 HTML，跳过留档");
                 return;
             }
@@ -637,7 +644,7 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
             Path file = dir.resolve(String.format("page_%d_%s.html", pageNum, timestamp));
             Files.writeString(file, "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\"></head>\n<body>\n"
                     + tableHtml + "\n</body>\n</html>");
-            log.info("💾 原始 HTML 已保存: {}", file);
+            log.info("💾 原始 HTML 已保存: {} ({} bytes)", file, tableHtml.length());
         } catch (Exception e) {
             log.warn("保存原始 HTML 失败: {}", e.getMessage());
         }
