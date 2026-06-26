@@ -1,9 +1,17 @@
-package com.ths.crawler.fetcher.okhttp;
+package com.ths.crawler.fetcher.thsw;
 
 import com.microsoft.playwright.*;
 import com.ths.crawler.config.PlaywrightConfig;
 import com.ths.crawler.model.entity.IndustryCapitalFlowEntity;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.stereotype.Component;
+import com.ths.crawler.config.PlaywrightEnabledCondition;
+import com.ths.crawler.core.DataFetcher;
+import com.ths.crawler.core.FetchContext;
+import com.ths.crawler.core.FetchResult;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -30,13 +38,20 @@ import java.util.regex.Pattern;
  * 实际采集（fetch）用 Playwright 浏览器自动化
  */
 @Slf4j
-public class OkHttpIndustryFetcher {
+@Component
+@Conditional(PlaywrightEnabledCondition.class)
+@RequiredArgsConstructor
+public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowEntity>> {
 
     // ============ 配置（通过反射注入） ============
-    private int retryCount = 3;
-    private int requestDelayMin = 500;
-    private int requestDelayMax = 1500;
-    private int maxPages = 2;
+    @Value("${ths.fetcher.retry-count:3}")
+    private int retryCount;
+    @Value("${ths.fetcher.request-delay-min:500}")
+    private int requestDelayMin;
+    @Value("${ths.fetcher.request-delay-max:1500}")
+    private int requestDelayMax;
+    @Value("${ths.fetcher.max-pages:2}")
+    private int maxPages;
 
     // 反重跑保护：5分钟内不重复采集
     // TODO: 全线跑通后放开 — 当前注释掉避免开发调试时误触发
@@ -60,20 +75,18 @@ public class OkHttpIndustryFetcher {
     private final Random random = new Random();
 
     // ============ Playwright（懒加载） ============
-    private Browser browser;
-    private PlaywrightConfig playwrightConfig;
+    private final PlaywrightConfig playwrightConfig;
 
     // ============ 构造器 ============
-    public OkHttpIndustryFetcher() {
+    public ThsIndustryFetcher() {
+        this.playwrightConfig = null;
         // 无参构造（测试用，配置通过反射注入）
     }
 
-    public OkHttpIndustryFetcher(PlaywrightConfig playwrightConfig) {
-        this.playwrightConfig = playwrightConfig;
-    }
 
     // ==================== 测试引用的方法 ====================
 
+    @Override
     public String getSource() {
         return "industry_capital_flow";
     }
@@ -228,7 +241,24 @@ public class OkHttpIndustryFetcher {
      * 执行全量采集（1~2页，约90个行业）
      * 参照 Selenium 方案的翻页策略：点击按钮 + DOM 指纹检测
      */
-    public List<IndustryCapitalFlowEntity> fetch() {
+    @Override
+    public FetchResult<List<IndustryCapitalFlowEntity>> fetch(FetchContext context) {
+        long __start = System.currentTimeMillis();
+        try {
+            List<IndustryCapitalFlowEntity> all = doFetch();
+            long __costMs = System.currentTimeMillis() - __start;
+            if (all.isEmpty()) {
+                return FetchResult.fail("采集结果为空");
+            }
+            return FetchResult.ok(all, null, __costMs);
+        } catch (Exception e) {
+            long __costMs = System.currentTimeMillis() - __start;
+            log.error("采集异常: {}", e.getMessage(), e);
+            return FetchResult.fail("采集异常: " + e.getMessage());
+        }
+    }
+
+    public List<IndustryCapitalFlowEntity> doFetch() {
         // ── 反重跑保护（暂注释，等全线跑通后放开） ──
         // 原理：5分钟内不重复采集，防止 crontab + 手动触发叠加导致封禁
         // if (System.currentTimeMillis() - lastFetchTime < 300_000) {

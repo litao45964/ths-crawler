@@ -5,7 +5,7 @@ package com.ths.crawler.core;
  * <p>
  * 实现类：
  * - AkshareSectorFlowFetcher (当前：通过Python AKShare获取)
- * - OkHttpSectorFlowFetcher   (后续：原生HTTP调用同花顺API)
+ * - ThsIndustryFetcher   (后续：原生HTTP调用同花顺API)
  * - 更多数据源只需新增实现类，通过 @ConditionalOnProperty 切换
  * <p>
  * 设计原则：
