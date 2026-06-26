@@ -81,6 +81,10 @@ ths:
     raw-ttl: 7
     clean-ttl: 30
 
+  # 爬虫调试配置
+  crawler:
+    debug-html: false  # 测试时改为 true，保存每页表格原始 HTML 到 logs/crawler/
+
   # 存储配置
   storage:
     async-pool-size: 4

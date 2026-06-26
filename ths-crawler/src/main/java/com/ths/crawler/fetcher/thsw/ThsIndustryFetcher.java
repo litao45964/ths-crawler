@@ -24,6 +24,12 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+
 /**
  * 行业资金流向采集器 — 参照 Selenium 成功方案，用 Playwright 浏览器自动化
  * <p>
@@ -52,6 +58,8 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
     private int requestDelayMax;
     @Value("${ths.fetcher.max-pages:2}")
     private int maxPages;
+    @Value("${ths.crawler.debug-html:false}")
+    private boolean debugHtml;
 
     // 反重跑保护：5分钟内不重复采集
     // TODO: 全线跑通后放开 — 当前注释掉避免开发调试时误触发
@@ -338,11 +346,13 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
             List<IndustryCapitalFlowEntity> page1 = extractTableData(page);
             log.info("📋 第1页: {} 条", page1.size());
             printPageData(page1, 1);
+            if (isDebugHtml()) saveRawHtml(page, 1);
 
             // 5. 翻页 — 参照 Selenium 方案的 DOM 指纹检测
             List<IndustryCapitalFlowEntity> page2 = clickPage2(page);
             log.info("📋 第2页: {} 条", page2.size());
             printPageData(page2, 2);
+            if (isDebugHtml()) saveRawHtml(page, 2);
 
             // 6. 合并
             List<IndustryCapitalFlowEntity> all = new ArrayList<>(page1);
@@ -600,6 +610,37 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
             log.info("    领涨股链接: {}", sample.getLeadingStockLink());
         }
         log.info(SEP + "\n");
+    }
+
+    /**
+     * 判断是否开启 HTML 留档（Spring @Value 注入 + 系统属性回退）
+     */
+    private boolean isDebugHtml() {
+        return debugHtml || "true".equalsIgnoreCase(System.getProperty("ths.crawler.debug-html", "false"));
+    }
+
+    /**
+     * 保存表格原始 HTML 到日志目录（调试用）
+     * 通过 ths.crawler.debug-html=true 开启
+     */
+    private void saveRawHtml(Page page, int pageNum) {
+        try {
+            String tableHtml = (String) page.evaluate(
+                "document.querySelector('table') ? document.querySelector('table').outerHTML : ''");
+            if (tableHtml == null || tableHtml.isEmpty()) {
+                log.warn("未找到表格 HTML，跳过留档");
+                return;
+            }
+            Path dir = Paths.get("logs/crawler");
+            Files.createDirectories(dir);
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            Path file = dir.resolve(String.format("page_%d_%s.html", pageNum, timestamp));
+            Files.writeString(file, "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\"></head>\n<body>\n"
+                    + tableHtml + "\n</body>\n</html>");
+            log.info("💾 原始 HTML 已保存: {}", file);
+        } catch (Exception e) {
+            log.warn("保存原始 HTML 失败: {}", e.getMessage());
+        }
     }
 
     // ==================== 工具方法 ====================
