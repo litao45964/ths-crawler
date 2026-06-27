@@ -1,6 +1,7 @@
 package com.ths.crawler.unit.service;
 
 import com.ths.crawler.mapper.IndustryCapitalFlowMapper;
+import com.ths.crawler.storage.DualWriteService;
 import com.ths.crawler.model.entity.IndustryCapitalFlowEntity;
 import com.ths.crawler.service.IndustryFlowService;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,11 +37,14 @@ class IndustryFlowServiceTest {
     @Mock
     private IndustryCapitalFlowMapper flowMapper;
 
+    @Mock
+    private DualWriteService dualWriteService;
+
     private IndustryFlowService flowService;
 
     @BeforeEach
     void setUp() {
-        flowService = new IndustryFlowService(industryFetcher, flowMapper);
+        flowService = new IndustryFlowService(industryFetcher, flowMapper, dualWriteService);
     }
 
     // ===================== getIndustryNames =====================

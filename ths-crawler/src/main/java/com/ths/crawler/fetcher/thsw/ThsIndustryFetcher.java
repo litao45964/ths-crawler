@@ -61,9 +61,8 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
     @Value("${ths.crawler.debug-html:false}")
     private boolean debugHtml;
 
-    // 反重跑保护：5分钟内不重复采集
-    // TODO: 全线跑通后放开 — 当前注释掉避免开发调试时误触发
-    // private long lastFetchTime = 0;
+    // 反重跑保护：5分钟内不重复采集，防止 crontab + 手动触发叠加导致封禁
+    private volatile long lastFetchTime = 0;
 
     // ============ 正则（参照 Selenium 方案） ============
     /** 行业代码正则：从 URL 中提取 /code/881121/ */
@@ -242,28 +241,61 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
     @Override
     public FetchResult<List<IndustryCapitalFlowEntity>> fetch(FetchContext context) {
         long __start = System.currentTimeMillis();
-        try {
-            List<IndustryCapitalFlowEntity> all = doFetch();
-            long __costMs = System.currentTimeMillis() - __start;
-            if (all.isEmpty()) {
-                return FetchResult.fail("采集结果为空");
+
+        int maxRetries = retryCount;
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                List<IndustryCapitalFlowEntity> all = doFetch();
+                long __costMs = System.currentTimeMillis() - __start;
+
+                if (all.isEmpty()) {
+                    // 空结果可能是封禁，不重试
+                    return FetchResult.fail("采集结果为空");
+                }
+
+                if (attempt > 1) {
+                    log.info("✅ 第{}次重试成功", attempt - 1);
+                }
+                return FetchResult.ok(all, null, __costMs);
+
+            } catch (BlockedException be) {
+                // 封禁不重试，立即返回
+                log.error("❌ 检测到封禁，不重试: {}", be.getMessage());
+                long __costMs = System.currentTimeMillis() - __start;
+                return FetchResult.fail("采集被封禁: " + be.getMessage());
+
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt < maxRetries) {
+                    int backoffMs = 2000 * attempt + random.nextInt(1000); // 2s/4s/6s 指数退避
+                    log.warn("⚠️ 第{}次采集异常，{}ms后重试 (剩余{}次): {}",
+                            attempt, backoffMs, maxRetries - attempt, e.getMessage());
+                    try {
+                        Thread.sleep(backoffMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                } else {
+                    log.error("❌ {}次重试全部失败: {}", maxRetries, e.getMessage());
+                }
             }
-            return FetchResult.ok(all, null, __costMs);
-        } catch (Exception e) {
-            long __costMs = System.currentTimeMillis() - __start;
-            log.error("采集异常: {}", e.getMessage(), e);
-            return FetchResult.fail("采集异常: " + e.getMessage());
         }
+
+        long __costMs = System.currentTimeMillis() - __start;
+        return FetchResult.fail("采集异常(已重试" + maxRetries + "次): " +
+                (lastException != null ? lastException.getMessage() : "未知错误"));
     }
 
     public List<IndustryCapitalFlowEntity> doFetch() {
-        // ── 反重跑保护（暂注释，等全线跑通后放开） ──
-        // 原理：5分钟内不重复采集，防止 crontab + 手动触发叠加导致封禁
-        // if (System.currentTimeMillis() - lastFetchTime < 300_000) {
-        //     log.warn("⏰ 距上次采集不足5分钟，跳过本次");
-        //     return Collections.emptyList();
-        // }
-        // lastFetchTime = System.currentTimeMillis();
+        // ── 反重跑保护 ──
+        if (System.currentTimeMillis() - lastFetchTime < 300_000) {
+            log.warn("⏰ 距上次采集不足5分钟，跳过本次");
+            return Collections.emptyList();
+        }
+        lastFetchTime = System.currentTimeMillis();
 
         long start = System.currentTimeMillis();
         log.info("\n" + SEP);
@@ -340,7 +372,7 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
             log.info("   HTTP 状态码: {}", statusCode);
             if (statusCode == 403 || statusCode == 429) {
                 log.error("❌ HTTP {} 封禁！立即终止采集，不重试", statusCode);
-                return Collections.emptyList();
+                throw new BlockedException("HTTP " + statusCode + " 封禁");
             }
             log.info("✅ 封禁检测通过");
             // 4. 解析第1页
@@ -692,6 +724,19 @@ public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowE
     private static String pct(BigDecimal v) {
         if (v == null) return "-";
         return String.format("%+.2f%%", v);
+    }
+
+    // ==================== 内部类：IndustryFlowData ====================
+
+    // ==================== 内部类：BlockedException ====================
+
+    /**
+     * 封禁异常 — 用于区分"采集失败"与"IP被封"，封禁不重试
+     */
+    public static class BlockedException extends RuntimeException {
+        public BlockedException(String message) {
+            super(message);
+        }
     }
 
     // ==================== 内部类：IndustryFlowData ====================

@@ -8,6 +8,7 @@ import com.ths.crawler.model.dto.SectorCapitalFlowDTO;
 import com.ths.crawler.model.dto.SectorCapitalFlowDTO.SectorFlowItem;
 import com.ths.crawler.processor.SectorCapitalFlowProcessor;
 import com.ths.crawler.storage.DualWriteService;
+import com.ths.crawler.service.TradeCalendarService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -28,6 +29,7 @@ public class SectorCapitalFlowJob {
     private final DataFetcher<List<AkshareSectorFlowRawDTO>> sectorFlowFetcher;
     private final SectorCapitalFlowProcessor processor;
     private final DualWriteService dualWriteService;
+    private final TradeCalendarService tradeCalendarService;
 
     /**
      * 每个交易日 15:30 执行
@@ -108,13 +110,9 @@ public class SectorCapitalFlowJob {
     }
 
     /**
-     * 交易日判断（简化版，后续接入交易日历API）
+     * 交易日判断（已接入 TradeCalendarService，支持节假日/调休）
      */
     private boolean isTradeDay() {
-        LocalDate today = LocalDate.now();
-        // 周末肯定不是
-        java.time.DayOfWeek dow = today.getDayOfWeek();
-        return dow != java.time.DayOfWeek.SATURDAY && dow != java.time.DayOfWeek.SUNDAY;
-        // TODO: 节假日判断，接入交易日历
+        return tradeCalendarService.isTradeDay(LocalDate.now());
     }
 }

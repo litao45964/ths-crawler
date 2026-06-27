@@ -111,12 +111,37 @@ public class DualWriteService {
      */
     public void logCrawl(String source, String status, int recordCount, long costMs, String errorMsg) {
         CrawlLogEntity entity = CrawlLogEntity.builder()
-                .source(source)
+                .taskType(source)
                 .status(status)
-                .recordCount(recordCount)
-                .costMs(costMs)
+                .rowsFetched(recordCount)
+                .startTime(LocalDateTime.now().minusNanos(costMs * 1_000_000L))
+                .endTime(LocalDateTime.now())
                 .errorMsg(errorMsg)
-                .tradeDate(LocalDate.now())
+                .phase("total")
+                .retryCount(0)
+                .createdAt(LocalDateTime.now())
+                .build();
+        crawlLogMapper.insert(entity);
+    }
+
+    /**
+     * 记录抓取日志（增强版，支持 traceId/phase/retryCount）
+     */
+    public void logCrawlWithTrace(String traceId, String taskType, String status, String phase,
+                                   int rowsFetched, int rowsSaved, long costMs,
+                                   int retryCount, String detail, String errorMsg) {
+        CrawlLogEntity entity = CrawlLogEntity.builder()
+                .traceId(traceId)
+                .taskType(taskType)
+                .status(status)
+                .phase(phase)
+                .rowsFetched(rowsFetched)
+                .rowsSaved(rowsSaved)
+                .startTime(LocalDateTime.now().minusNanos(costMs * 1_000_000L))
+                .endTime(LocalDateTime.now())
+                .detail(detail)
+                .retryCount(retryCount)
+                .errorMsg(errorMsg)
                 .createdAt(LocalDateTime.now())
                 .build();
         crawlLogMapper.insert(entity);

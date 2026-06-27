@@ -4,6 +4,7 @@ import com.ths.crawler.core.DataFetcher;
 import com.ths.crawler.core.FetchContext;
 import com.ths.crawler.core.FetchResult;
 import com.ths.crawler.mapper.IndustryCapitalFlowMapper;
+import com.ths.crawler.storage.DualWriteService;
 import com.ths.crawler.model.dto.IndustryFlowDTO;
 import com.ths.crawler.model.entity.IndustryCapitalFlowEntity;
 import lombok.RequiredArgsConstructor;
@@ -30,6 +31,8 @@ public class IndustryFlowService {
 
     private final IndustryCapitalFlowMapper flowMapper;
 
+    private final DualWriteService dualWriteService;
+
     @Value("${ths.fetcher.sector-flow:akshare}")
     private String fetcherType;
 
@@ -45,6 +48,14 @@ public class IndustryFlowService {
         long start = System.currentTimeMillis();
         String traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
         log.info("[traceId={}] === 开始日度行业资金流向采集 ===", traceId);
+
+        // 记录开始
+        try {
+            dualWriteService.logCrawlWithTrace(traceId, "industry_flow", "running", "total",
+                    0, 0, 0, 0, null, null);
+        } catch (Exception ignored) {
+            // 日志记录失败不影响主流程
+        }
 
         try {
             // 1. 通过接口抓取行业数据
@@ -62,7 +73,12 @@ public class IndustryFlowService {
 
             if (!fetchResult.isSuccess() || fetchResult.getData() == null || fetchResult.getData().isEmpty()) {
                 log.error("[traceId={}] 行业资金流向数据为空: {}", traceId, fetchResult.getErrorMsg());
-                return CollectResult.fail("抓取数据为空: " + fetchResult.getErrorMsg());
+                try {
+                dualWriteService.logCrawlWithTrace(traceId, "industry_flow", "fail", "fetch",
+                        0, 0, fetchCost, 0, null,
+                        "抓取数据为空: " + fetchResult.getErrorMsg());
+            } catch (Exception ignored) {}
+            return CollectResult.fail("抓取数据为空: " + fetchResult.getErrorMsg());
             }
 
             List<IndustryCapitalFlowEntity> entities = fetchResult.getData();
@@ -77,11 +93,22 @@ public class IndustryFlowService {
             log.info("[traceId={}] === 日度行业资金流向采集完成: count={}, inserted={}, cost={}ms ===",
                     traceId, entities.size(), inserted, costMs);
 
+            // 记录成功
+            String detail = String.format("{\"fetchCost\":%d,\"saveCost\":%d}", fetchCost, saveCost);
+            try {
+                dualWriteService.logCrawlWithTrace(traceId, "industry_flow", "success", "total",
+                        entities.size(), inserted, costMs, 0, detail, null);
+            } catch (Exception ignored) {}
+
             return CollectResult.ok(entities.size(), inserted, LocalDate.now().toString(), costMs);
 
         } catch (Exception e) {
             long costMs = System.currentTimeMillis() - start;
             log.error("[traceId={}] 日度行业资金流向采集失败, cost={}ms", traceId, costMs, e);
+            try {
+                dualWriteService.logCrawlWithTrace(traceId, "industry_flow", "fail", "total",
+                        0, 0, costMs, 0, null, "采集异常: " + e.getMessage());
+            } catch (Exception ignored) {}
             return CollectResult.fail("采集异常: " + e.getMessage());
         }
     }
