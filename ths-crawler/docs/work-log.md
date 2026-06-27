@@ -29,6 +29,74 @@
 
 ---
 
+## 2026-06-27（周六）
+
+### 核心提炼
+
+1. 6项P0一次性闭环：调度器反重跑保护+统一响应+前端增强(趋势计算/补采/交易日历)+异常重试(指数退避2s/4s/6s)+链路埋点(V5 Flyway+traceId)，44单测全绿，commit d656ebd
+2. 部署验证全链路通过：5个API全部验证+前端日历页200+crawl_log埋点traceId贯穿，commit f9e3421
+3. dev-workflow-guide版本三合一：发现Git/项目空间三个版本不一致，以Git为基准更新+四层同步，消灭重复版本
+4. 云电脑全面部署验证：restart-after-reboot.sh+startup.sh修复+前端build(14.98s/3638模块)+日历页https://ths.thsflow.xyz/calendar
+5. npm install策略反思+heredoc方案：沙箱不做重复劳动，云电脑复用已有node_modules；砍掉base64，默认用heredoc
+
+### 工作明细
+
+- [09:05] 前端项目结构查看，确认Phase 1开发范围
+- [09:13] 【里程碑·P0】6项P0一次性闭环：调度器反重跑保护放开+SectorCapitalFlowJob接入交易日历+统一响应+前端增强(趋势计算按钮+补采DatePicker+交易日历页面)+异常重试(指数退避2s/4s/6s+封禁不重试)+链路埋点(V5 Flyway+CrawlLogEntity对齐+traceId贯穿)，44单元测试全绿，commit d656ebd
+- [09:17] 【里程碑·P0】部署验证全部通过：5个API全部验证+collect 90条17.7s(周六大盘无数据但框架正常)+crawl_log埋点traceId贯穿，commit f9e3421
+- [09:31] 【思辨探索·P1】dev-workflow-guide版本对比：发现Git/项目空间三个版本不一致，Git版本是唯一靠谱基线
+- [09:35] 【卡点突破·P1】关键发现：项目空间两个版本是中间草稿未同步Git，场景E hotfix与铁律冲突，操作顺序不一致
+- [09:40] 【里程碑·P1】dev-workflow-guide更新方案确定：以Git为基准，更新+四层同步（GitHub→云电脑→项目空间→沙箱记忆），消灭重复版本
+- [10:15] 【思辨探索·P1】MEMORY.md vs TOOLS.md本质区别分析：MEMORY管行为决策(我是谁/我在做什么/我该怎么做)，TOOLS管操作执行(用这个工具时哪些坑不能踩)
+- [10:28] 【思辨探索·P1】npm install策略反思：沙箱从零下载node_modules是浪费，云电脑有现成缓存应复用，铁律①的意图是沙箱不做重复劳动
+- [10:53] 验证沙箱git clone完整性：后端Java源码齐全，前端TSX齐全，缺node_modules和.m2
+- [10:55] 【思辨探索·P1】base64传递方案反思：砍掉base64，默认用heredoc，小改动直接用sed
+- [18:20] 【里程碑·P1】云电脑全面部署验证：restart-after-reboot.sh写入/root/+startup.sh mysqld目录+Java检查修复+前端build(14.98s/3638模块)+日历页200+API 200，发现tsc&&vite build链式调用会卡死改用npx vite build
+
+---
+
+## 2026-06-26（周五）
+
+### 核心提炼
+
+1. 采集器架构重整：全景梳理→发现OkHttpIndustryFetcher是孤儿类→重命名ThsIndustryFetcher→删除4废弃类，Pipeline A/B各留唯一实现，commit a2da266
+2. isBlocked误判修复：HTML全文匹配→HTTP状态码检测(403/429=封禁/200=放行)，printStats NPE修复，采集90条通过
+3. 铁律⑪-⑯确立：文档路径规范+职责分离+TDD优化(mvn test/mvn verify)+封禁检测(HTTP状态码优先)+Git同步(开发前先pull)，commit 976224f
+4. stockIdx列偏移修复：少算"公司家数"列→cells.size()>=10?8:6，领涨股代码覆盖率0%→100%
+5. logback+HTML留档+run-it.sh：日志落地+调试原始HTML可追溯+集成测试脚本(pkill残留+timeout 300兜底)
+
+### 工作明细
+
+- [12:35] 【卡点突破·P0】反封禁5风险点分析：isBlocked未调用/缺静默等待/漏检Nginx forbidden/翻页太快(500ms×30)/无反重跑保护，3个必须改业务代码+1个防御性+1个部署策略
+- [12:42] 【思辨探索·P1】5风险点分类：isBlocked未调用+静默等待+翻页降速是业务代码问题（单元测试覆盖不了），反重跑是部署策略
+- [12:53] 【卡点突破·P0】isBlocked激活方案确定：页面加载后调用+补nginx forbidden检测+3-6s随机等待+翻页1000-1500ms
+- [15:22] 【思辨探索·P1】DataFetcher四套实现全景梳理：Pipeline A/B互不干扰，发现OkHttpIndustryFetcher缺少@Component从未被Spring调用
+- [15:23] 【卡点突破·P0】关键发现：OkHttpIndustryFetcher是孤儿类（无@Component/无@ConditionalOnProperty），真正需要反封禁的是PlaywrightIndustryFetcher（408行无反封禁保护）
+- [15:34] 【思辨探索·P1】DataFetcher实现全景图+两套Pipeline互不干扰分析，配置切换方式明确
+- [16:14] 【卡点突破·P1】发现前端走Pipeline B但PlaywrightIndustryFetcher无反封禁保护，前端每次采集都在冒险
+- [16:35] 【思辨探索·P1】采集器重命名方案：OkHttpIndustryFetcher→ThsIndustryFetcher（底层是Playwright不是OkHttp）
+- [16:41] 【思辨探索·P1】确认OkHttpIndustryFetcher底层是Playwright（Browser/Page/PlaywrightConfig），类名起错了，重命名方案精确化
+- [16:51] 【里程碑·P0】采集器架构重整完成：OkHttpIndustryFetcher→ThsIndustryFetcher(@Component+实现DataFetcher)，删除4废弃类(ThsIndustryPageFetcher/OkHttpSectorFlowFetcher/PlaywrightIndustryFetcher及其测试)，Pipeline A/B各留唯一实现，commit a2da266
+- [17:16] 【里程碑·P1】铁律⑪确立：非代码文件统一放/ths-crawler/docs/，禁止放/docs/
+- [17:18] 【里程碑·P1】文件纠正：P0任务vs前后端联调现状.md移到/ths-crawler/docs/
+- [17:29] 【里程碑·P1】铁律⑫确立：/docs/为历史遗留禁止上传/更新/读取/删除，铁律全集上传到项目空间/ths-crawler/docs/作为唯一源
+- [17:55] 【卡点突破·P0】isBlocked误判定位：独立Playwright脚本正常，Maven测试里isBlocked()返回true，需排查page.content()在Maven环境下的完整内容
+- [18:06] 【思辨探索·P1】isBlocked简化方案：去掉HTML内容检测，只靠HTTP状态码（403/429=封禁，200=正常解析），数据落地优先
+- [18:09] 【卡点突破·P0】isBlocked修复完成：删除HTML全文匹配方法，替换为response.status()==403/429检测，同步删除旧测试
+- [18:15] 【里程碑·P0】采集验证通过：isBlocked修复后90条数据正常（第1页50条+第2页40条），误判问题彻底解决
+- [18:19] 【思辨探索·P1】开发验证提速+定时采集提速方案：mvn test排除IT测试(6s)，mvn verify跑集成测试(40s)，Browser复用自然生效
+- [18:24] 【思辨探索·P1】TDD优化：绿过的测试不碰，按改动自动选测试，surefire配置拆分
+- [18:30] 【里程碑·P0】铁律⑮确立：mvn test只跑单元测试，mvn verify跑集成测试
+- [18:31] 【里程碑·P1】surefire/failsafe配置拆分完成：44单元测试3s全绿，0集成测试
+- [18:32] 【里程碑·P1】铁律⑬⑭⑯同步确立：架构变更后同步文档+需求清单与状态文档职责分离+封禁检测优先HTTP状态码，commit 976224f
+- [18:42] 【思辨探索·P1】日志留存方案：logback文件输出+原始HTML留档（DEBUG级别），生产环境默认关闭
+- [18:51] 【里程碑·P1】logback-spring.xml+HTML留档实现完成（commit b465b75），集成测试生成4个HTML文件验证通过
+- [19:21] 【卡点突破·P1】stockIdx列偏移修复：少算"公司家数"列→cells.size()>=10?8:6，领涨股代码覆盖率0%→100%
+- [19:38] 【思辨探索·P1】集成测试卡死分析：Playwright残留进程占端口→pkill+timeout方案
+- [19:42] 【里程碑·P1】run-it.sh脚本创建：pkill残留+timeout 300兜底+debug-html开关，17秒跑完集成测试，commit cda4ec1
+
+---
+
 ## 2026-06-25（周四）
 
 ### 核心提炼
