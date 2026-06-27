@@ -104,6 +104,12 @@ export async function triggerCollect() {
   return res.data;
 }
 
+/** 手动补采指定日期 */
+export async function triggerCollectByDate(date: string) {
+  const res = await api.post<ApiResponse<CollectResult>>(`/api/industry-flow/collect/${date}`);
+  return res.data;
+}
+
 /** 查询行业名称列表 */
 export async function fetchIndustries() {
   const res = await api.get<ApiResponse<string[]>>('/api/industry-flow/industries');

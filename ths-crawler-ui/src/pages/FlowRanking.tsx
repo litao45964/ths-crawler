@@ -1,8 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Select, Button, Table, message, Spin, Space, Grid } from 'antd';
-import { SyncOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Select, Button, Table, DatePicker, message, Spin, Space, Grid } from 'antd';
+import { SyncOutlined, DownloadOutlined, HistoryOutlined } from '@ant-design/icons';
+import dayjs from 'dayjs';
 import ReactECharts from 'echarts-for-react';
-import { fetchLatestFlow, triggerCollect, wanToYi, formatAmount, formatPct } from '../api';
+import { fetchLatestFlow, triggerCollect, triggerCollectByDate, wanToYi, formatAmount, formatPct } from '../api';
 import type { IndustryFlowItem } from '../api';
 import darkTheme from '../theme/echarts';
 
@@ -79,6 +80,8 @@ export default function FlowRanking() {
   const [data, setData] = useState<IndustryFlowItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [collecting, setCollecting] = useState(false);
+  const [backfillDate, setBackfillDate] = useState<string | null>(null);
+  const [backfilling, setBackfilling] = useState(false);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -103,13 +106,34 @@ export default function FlowRanking() {
     try {
       const res = await triggerCollect();
       if (res.success) {
-        message.success(`采集成功！共 ${res.totalRows} 条，耗时 ${res.costMs}ms`);
+        message.success(`采集成功！共 ${res.data.totalRows} 条，耗时 ${res.data.costMs}ms`);
         loadData();
       }
     } catch (err) {
       message.error('采集失败：' + (err as Error).message);
     } finally {
       setCollecting(false);
+    }
+  };
+
+  const handleBackfill = async () => {
+    if (!backfillDate) {
+      message.warning('请选择补采日期');
+      return;
+    }
+    setBackfilling(true);
+    try {
+      const res = await triggerCollectByDate(backfillDate);
+      if (res.success) {
+        message.success(`补采成功！日期 ${backfillDate}，共 ${res.data.totalRows} 条`);
+        loadData();
+      } else {
+        message.error('补采失败：' + (res.message || '未知错误'));
+      }
+    } catch (err) {
+      message.error('补采失败：' + (err as Error).message);
+    } finally {
+      setBackfilling(false);
     }
   };
 
@@ -134,10 +158,10 @@ export default function FlowRanking() {
       bottom: 30,
     },
     xAxis: {
-      ...darkTheme.xAxis,
+      ...(darkTheme.xAxis as Record<string, unknown>),
       type: 'value' as const,
       axisLabel: {
-        ...((darkTheme.xAxis as any)?.axisLabel || {}),
+        ...((darkTheme.xAxis as Record<string, unknown>)?.axisLabel as Record<string, unknown>),
         formatter: (v: number) => (v / 10000).toFixed(0) + '亿',
       },
     },
@@ -308,15 +332,32 @@ export default function FlowRanking() {
           <span style={{ color: '#8899aa' }}>排序方式</span>
           <Select value={orderBy} options={orderByOptions} onChange={setOrderBy} style={{ width: 110 }} />
         </Space>
-        <Button
-          type="primary"
-          icon={<DownloadOutlined />}
-          onClick={handleCollect}
-          loading={collecting}
-          style={{ background: '#1677ff' }}
-        >
-          手动采集
-        </Button>
+        <Space>
+          <DatePicker
+            value={backfillDate ? dayjs(backfillDate) : null}
+            onChange={(d: dayjs.Dayjs | null) => setBackfillDate(d ? d.format('YYYY-MM-DD') : null)}
+            placeholder="选择补采日期"
+            style={{ width: 160 }}
+            allowClear
+          />
+          <Button
+            type="default"
+            icon={<HistoryOutlined />}
+            onClick={handleBackfill}
+            loading={backfilling}
+          >
+            补采
+          </Button>
+          <Button
+            type="primary"
+            icon={<DownloadOutlined />}
+            onClick={handleCollect}
+            loading={collecting}
+            style={{ background: '#1677ff' }}
+          >
+            手动采集
+          </Button>
+        </Space>
       </div>
 
       <Spin spinning={loading}>
