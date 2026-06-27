@@ -111,14 +111,14 @@ public class DualWriteService {
      */
     public void logCrawl(String source, String status, int recordCount, long costMs, String errorMsg) {
         CrawlLogEntity entity = CrawlLogEntity.builder()
-                .taskType(source)
+                .source(source)
                 .status(status)
-                .rowsFetched(recordCount)
-                .startTime(LocalDateTime.now().minusNanos(costMs * 1_000_000L))
-                .endTime(LocalDateTime.now())
+                .recordCount(recordCount)
+                .costMs(costMs)
                 .errorMsg(errorMsg)
                 .phase("total")
                 .retryCount(0)
+                .tradeDate(LocalDate.now())
                 .createdAt(LocalDateTime.now())
                 .build();
         crawlLogMapper.insert(entity);
@@ -127,21 +127,20 @@ public class DualWriteService {
     /**
      * 记录抓取日志（增强版，支持 traceId/phase/retryCount）
      */
-    public void logCrawlWithTrace(String traceId, String taskType, String status, String phase,
-                                   int rowsFetched, int rowsSaved, long costMs,
+    public void logCrawlWithTrace(String traceId, String source, String status, String phase,
+                                   int recordCount, int rowsSaved, long costMs,
                                    int retryCount, String detail, String errorMsg) {
         CrawlLogEntity entity = CrawlLogEntity.builder()
                 .traceId(traceId)
-                .taskType(taskType)
+                .source(source)
                 .status(status)
                 .phase(phase)
-                .rowsFetched(rowsFetched)
-                .rowsSaved(rowsSaved)
-                .startTime(LocalDateTime.now().minusNanos(costMs * 1_000_000L))
-                .endTime(LocalDateTime.now())
+                .recordCount(recordCount)
+                .costMs(costMs)
                 .detail(detail)
                 .retryCount(retryCount)
                 .errorMsg(errorMsg)
+                .tradeDate(LocalDate.now())
                 .createdAt(LocalDateTime.now())
                 .build();
         crawlLogMapper.insert(entity);

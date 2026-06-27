@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@TableName("crawl_log")
+@TableName("ths_crawl_log")
 public class CrawlLogEntity {
 
     @TableId(type = IdType.AUTO)
@@ -25,26 +25,20 @@ public class CrawlLogEntity {
     /** 链路追踪ID */
     private String traceId;
 
-    /** 任务类型 */
-    private String taskType;
+    /** 数据源标识 */
+    private String source;
 
-    /** 状态：running / success / failed */
+    /** 状态：SUCCESS / FAIL / PARTIAL */
     private String status;
 
     /** 采集阶段：fetch / save / total */
     private String phase;
 
-    /** 开始时间 */
-    private LocalDateTime startTime;
+    /** 抓取记录数 */
+    private Integer recordCount;
 
-    /** 结束时间 */
-    private LocalDateTime endTime;
-
-    /** 抓取行数 */
-    private Integer rowsFetched;
-
-    /** 保存行数 */
-    private Integer rowsSaved;
+    /** 耗时毫秒 */
+    private Long costMs;
 
     /** 阶段详情（JSON） */
     private String detail;
@@ -54,6 +48,9 @@ public class CrawlLogEntity {
 
     /** 错误信息 */
     private String errorMsg;
+
+    /** 交易日期 */
+    private LocalDate tradeDate;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
