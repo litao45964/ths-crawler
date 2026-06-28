@@ -1,9 +1,17 @@
-package com.ths.crawler.fetcher.okhttp;
+package com.ths.crawler.fetcher.thsw;
 
 import com.microsoft.playwright.*;
 import com.ths.crawler.config.PlaywrightConfig;
 import com.ths.crawler.model.entity.IndustryCapitalFlowEntity;
 import lombok.extern.slf4j.Slf4j;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.stereotype.Component;
+import com.ths.crawler.config.PlaywrightEnabledCondition;
+import com.ths.crawler.core.DataFetcher;
+import com.ths.crawler.core.FetchContext;
+import com.ths.crawler.core.FetchResult;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -15,6 +23,12 @@ import java.time.LocalDate;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 /**
  * 行业资金流向采集器 — 参照 Selenium 成功方案，用 Playwright 浏览器自动化
@@ -30,17 +44,25 @@ import java.util.regex.Pattern;
  * 实际采集（fetch）用 Playwright 浏览器自动化
  */
 @Slf4j
-public class OkHttpIndustryFetcher {
+@Component
+@Conditional(PlaywrightEnabledCondition.class)
+@RequiredArgsConstructor
+public class ThsIndustryFetcher implements DataFetcher<List<IndustryCapitalFlowEntity>> {
 
     // ============ 配置（通过反射注入） ============
-    private int retryCount = 3;
-    private int requestDelayMin = 500;
-    private int requestDelayMax = 1500;
-    private int maxPages = 2;
+    @Value("${ths.fetcher.retry-count:3}")
+    private int retryCount;
+    @Value("${ths.fetcher.request-delay-min:500}")
+    private int requestDelayMin;
+    @Value("${ths.fetcher.request-delay-max:1500}")
+    private int requestDelayMax;
+    @Value("${ths.fetcher.max-pages:2}")
+    private int maxPages;
+    @Value("${ths.crawler.debug-html:false}")
+    private boolean debugHtml;
 
-    // 反重跑保护：5分钟内不重复采集
-    // TODO: 全线跑通后放开 — 当前注释掉避免开发调试时误触发
-    // private long lastFetchTime = 0;
+    // 反重跑保护：5分钟内不重复采集，防止 crontab + 手动触发叠加导致封禁
+    private volatile long lastFetchTime = 0;
 
     // ============ 正则（参照 Selenium 方案） ============
     /** 行业代码正则：从 URL 中提取 /code/881121/ */
@@ -60,20 +82,18 @@ public class OkHttpIndustryFetcher {
     private final Random random = new Random();
 
     // ============ Playwright（懒加载） ============
-    private Browser browser;
-    private PlaywrightConfig playwrightConfig;
+    private final PlaywrightConfig playwrightConfig;
 
     // ============ 构造器 ============
-    public OkHttpIndustryFetcher() {
+    public ThsIndustryFetcher() {
+        this.playwrightConfig = null;
         // 无参构造（测试用，配置通过反射注入）
     }
 
-    public OkHttpIndustryFetcher(PlaywrightConfig playwrightConfig) {
-        this.playwrightConfig = playwrightConfig;
-    }
 
     // ==================== 测试引用的方法 ====================
 
+    @Override
     public String getSource() {
         return "industry_capital_flow";
     }
@@ -123,7 +143,8 @@ public class OkHttpIndustryFetcher {
                 d.netAmount = parseYi(cells.get(5 + colOffset).text());
 
                 // ── 领涨股 + 链接 + 代码 + 涨幅（Jsoup版）──
-                int stockIdx = 6 + colOffset;
+                // 10/11列格式：领涨股在索引8（8列格式在索引6），比数值列多偏移1列（公司家数）
+                int stockIdx = cells.size() >= 10 ? 8 : 6;
                 if (cells.size() > stockIdx) {
                     org.jsoup.nodes.Element stockCell = cells.get(stockIdx);
                     Elements stLinks = stockCell.select("a");
@@ -207,17 +228,6 @@ public class OkHttpIndustryFetcher {
         return requestDelayMin + random.nextInt(requestDelayMax - requestDelayMin + 1);
     }
 
-    boolean isBlocked(String html) {
-        if (html == null) return true;
-        String lower = html.toLowerCase();
-        return lower.contains("403 forbidden")
-                || lower.contains("429 too many requests")
-                || lower.contains("nginx forbidden")
-                || lower.contains("forbidden")
-                || lower.contains("访问过于频繁")
-                || lower.contains("ip已被封禁")
-                || lower.contains("chameleon");
-    }
 
     // ==================== 核心采集（Playwright，参照 Selenium 方案） ====================
 
@@ -228,14 +238,64 @@ public class OkHttpIndustryFetcher {
      * 执行全量采集（1~2页，约90个行业）
      * 参照 Selenium 方案的翻页策略：点击按钮 + DOM 指纹检测
      */
-    public List<IndustryCapitalFlowEntity> fetch() {
-        // ── 反重跑保护（暂注释，等全线跑通后放开） ──
-        // 原理：5分钟内不重复采集，防止 crontab + 手动触发叠加导致封禁
-        // if (System.currentTimeMillis() - lastFetchTime < 300_000) {
-        //     log.warn("⏰ 距上次采集不足5分钟，跳过本次");
-        //     return Collections.emptyList();
-        // }
-        // lastFetchTime = System.currentTimeMillis();
+    @Override
+    public FetchResult<List<IndustryCapitalFlowEntity>> fetch(FetchContext context) {
+        long __start = System.currentTimeMillis();
+
+        int maxRetries = retryCount;
+        Exception lastException = null;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                List<IndustryCapitalFlowEntity> all = doFetch();
+                long __costMs = System.currentTimeMillis() - __start;
+
+                if (all.isEmpty()) {
+                    // 空结果可能是封禁，不重试
+                    return FetchResult.fail("采集结果为空");
+                }
+
+                if (attempt > 1) {
+                    log.info("✅ 第{}次重试成功", attempt - 1);
+                }
+                return FetchResult.ok(all, null, __costMs);
+
+            } catch (BlockedException be) {
+                // 封禁不重试，立即返回
+                log.error("❌ 检测到封禁，不重试: {}", be.getMessage());
+                long __costMs = System.currentTimeMillis() - __start;
+                return FetchResult.fail("采集被封禁: " + be.getMessage());
+
+            } catch (Exception e) {
+                lastException = e;
+                if (attempt < maxRetries) {
+                    int backoffMs = 2000 * attempt + random.nextInt(1000); // 2s/4s/6s 指数退避
+                    log.warn("⚠️ 第{}次采集异常，{}ms后重试 (剩余{}次): {}",
+                            attempt, backoffMs, maxRetries - attempt, e.getMessage());
+                    try {
+                        Thread.sleep(backoffMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                } else {
+                    log.error("❌ {}次重试全部失败: {}", maxRetries, e.getMessage());
+                }
+            }
+        }
+
+        long __costMs = System.currentTimeMillis() - __start;
+        return FetchResult.fail("采集异常(已重试" + maxRetries + "次): " +
+                (lastException != null ? lastException.getMessage() : "未知错误"));
+    }
+
+    public List<IndustryCapitalFlowEntity> doFetch() {
+        // ── 反重跑保护 ──
+        if (System.currentTimeMillis() - lastFetchTime < 300_000) {
+            log.warn("⏰ 距上次采集不足5分钟，跳过本次");
+            return Collections.emptyList();
+        }
+        lastFetchTime = System.currentTimeMillis();
 
         long start = System.currentTimeMillis();
         log.info("\n" + SEP);
@@ -280,7 +340,7 @@ public class OkHttpIndustryFetcher {
 
             // 3. 导航到页面
             log.info("🌐 导航到: {}", PAGE_URL);
-            page.navigate(PAGE_URL, new Page.NavigateOptions()
+            com.microsoft.playwright.Response response = page.navigate(PAGE_URL, new Page.NavigateOptions()
                     .setWaitUntil(com.microsoft.playwright.options.WaitUntilState.DOMCONTENTLOADED));
             log.info("   DOM 加载完成，等待表格渲染...");
 
@@ -307,24 +367,25 @@ public class OkHttpIndustryFetcher {
             page.waitForTimeout(humanDelay);
             log.info("✅ 页面加载完成");
 
-            // ── 封禁检测：拿到页面内容先判断是否被封 ──
-            String pageContent = page.content();
-            if (isBlocked(pageContent)) {
-                log.error("❌ 检测到封禁页面！立即终止采集，不重试");
-                log.error("   页面内容头500字:\n{}", pageContent.substring(0, Math.min(500, pageContent.length())));
-                return Collections.emptyList();
+            // ── 封禁检测：用 HTTP 状态码判断 ──
+            int statusCode = response.status();
+            log.info("   HTTP 状态码: {}", statusCode);
+            if (statusCode == 403 || statusCode == 429) {
+                log.error("❌ HTTP {} 封禁！立即终止采集，不重试", statusCode);
+                throw new BlockedException("HTTP " + statusCode + " 封禁");
             }
             log.info("✅ 封禁检测通过");
-
             // 4. 解析第1页
             List<IndustryCapitalFlowEntity> page1 = extractTableData(page);
             log.info("📋 第1页: {} 条", page1.size());
             printPageData(page1, 1);
+            if (isDebugHtml()) saveRawHtml(page, 1);
 
             // 5. 翻页 — 参照 Selenium 方案的 DOM 指纹检测
             List<IndustryCapitalFlowEntity> page2 = clickPage2(page);
             log.info("📋 第2页: {} 条", page2.size());
             printPageData(page2, 2);
+            if (isDebugHtml()) saveRawHtml(page, 2);
 
             // 6. 合并
             List<IndustryCapitalFlowEntity> all = new ArrayList<>(page1);
@@ -495,7 +556,8 @@ public class OkHttpIndustryFetcher {
                 entity.setNetAmount(parseYi(cells.get(5 + colOffset).innerText().trim()));
 
                 // ── 领涨股 + 领涨股链接 + 领涨股代码（参照 Selenium 正则提取）──
-                int stockIdx = 6 + colOffset;
+                // 10/11列格式：领涨股在索引8（8列格式在索引6），比数值列多偏移1列（公司家数）
+                int stockIdx = cells.size() >= 10 ? 8 : 6;
                 if (cells.size() > stockIdx) {
                     List<ElementHandle> stockLinks = cells.get(stockIdx).querySelectorAll("a");
                     if (!stockLinks.isEmpty()) {
@@ -557,10 +619,10 @@ public class OkHttpIndustryFetcher {
     }
 
     private void printStats(List<IndustryCapitalFlowEntity> list, long costMs) {
-        int withCode = (int) list.stream().filter(d -> !d.getIndustryCode().isEmpty()).count();
-        int withLink = (int) list.stream().filter(d -> !d.getIndustryLink().isEmpty()).count();
-        int withSCode = (int) list.stream().filter(d -> !d.getLeadingStockCode().isEmpty()).count();
-        int withSLink = (int) list.stream().filter(d -> !d.getLeadingStockLink().isEmpty()).count();
+        int withCode = (int) list.stream().filter(d -> d.getIndustryCode() != null && !d.getIndustryCode().isEmpty()).count();
+        int withLink = (int) list.stream().filter(d -> d.getIndustryLink() != null && !d.getIndustryLink().isEmpty()).count();
+        int withSCode = (int) list.stream().filter(d -> d.getLeadingStockCode() != null && !d.getLeadingStockCode().isEmpty()).count();
+        int withSLink = (int) list.stream().filter(d -> d.getLeadingStockLink() != null && !d.getLeadingStockLink().isEmpty()).count();
         int total = list.size();
 
         log.info("\n" + SEP);
@@ -582,6 +644,42 @@ public class OkHttpIndustryFetcher {
             log.info("    领涨股链接: {}", sample.getLeadingStockLink());
         }
         log.info(SEP + "\n");
+    }
+
+    /**
+     * 判断是否开启 HTML 留档（Spring @Value 注入 + 系统属性回退）
+     */
+    private boolean isDebugHtml() {
+        return debugHtml || "true".equalsIgnoreCase(System.getProperty("ths.crawler.debug-html", "false"));
+    }
+
+    /**
+     * 保存表格原始 HTML 到日志目录（调试用）
+     * 通过 ths.crawler.debug-html=true 开启
+     */
+    private void saveRawHtml(Page page, int pageNum) {
+        try {
+            // 用 page.content() 获取完整渲染后的 HTML（含 AJAX 动态加载的 tbody）
+            String fullHtml = page.content();
+            // 提取表格片段：找 <table 开头到 </table> 结尾
+            int tableStart = fullHtml.indexOf("<table");
+            int tableEnd = fullHtml.lastIndexOf("</table>");
+            String tableHtml = (tableStart >= 0 && tableEnd > tableStart)
+                    ? fullHtml.substring(tableStart, tableEnd + 8) : "";
+            if (tableHtml.isEmpty()) {
+                log.warn("未找到表格 HTML，跳过留档");
+                return;
+            }
+            Path dir = Paths.get("logs/crawler");
+            Files.createDirectories(dir);
+            String timestamp = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
+            Path file = dir.resolve(String.format("page_%d_%s.html", pageNum, timestamp));
+            Files.writeString(file, "<!DOCTYPE html>\n<html>\n<head><meta charset=\"UTF-8\"></head>\n<body>\n"
+                    + tableHtml + "\n</body>\n</html>");
+            log.info("💾 原始 HTML 已保存: {} ({} bytes)", file, tableHtml.length());
+        } catch (Exception e) {
+            log.warn("保存原始 HTML 失败: {}", e.getMessage());
+        }
     }
 
     // ==================== 工具方法 ====================
@@ -626,6 +724,19 @@ public class OkHttpIndustryFetcher {
     private static String pct(BigDecimal v) {
         if (v == null) return "-";
         return String.format("%+.2f%%", v);
+    }
+
+    // ==================== 内部类：IndustryFlowData ====================
+
+    // ==================== 内部类：BlockedException ====================
+
+    /**
+     * 封禁异常 — 用于区分"采集失败"与"IP被封"，封禁不重试
+     */
+    public static class BlockedException extends RuntimeException {
+        public BlockedException(String message) {
+            super(message);
+        }
     }
 
     // ==================== 内部类：IndustryFlowData ====================

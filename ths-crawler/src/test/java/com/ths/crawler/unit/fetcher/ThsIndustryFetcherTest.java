@@ -1,7 +1,7 @@
 package com.ths.crawler.unit.fetcher;
 
-import com.ths.crawler.fetcher.okhttp.OkHttpIndustryFetcher;
-import com.ths.crawler.fetcher.okhttp.OkHttpIndustryFetcher.IndustryFlowData;
+import com.ths.crawler.fetcher.thsw.ThsIndustryFetcher;
+import com.ths.crawler.fetcher.thsw.ThsIndustryFetcher.IndustryFlowData;
 import com.ths.crawler.model.entity.IndustryCapitalFlowEntity;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -15,19 +15,19 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * OkHttpIndustryFetcher 单元测试 — TDD红灯
+ * ThsIndustryFetcher 单元测试 — TDD红灯
  * <p>
  * 测试策略：用真实HTML片段验证解析逻辑，不依赖外部网络
  * 集成测试在云电脑上跑（铁律⑦）
  */
-@DisplayName("OkHttpIndustryFetcher")
-class OkHttpIndustryFetcherTest {
+@DisplayName("ThsIndustryFetcher")
+class ThsIndustryFetcherTest {
 
-    private OkHttpIndustryFetcher fetcher;
+    private ThsIndustryFetcher fetcher;
 
     @BeforeEach
     void setUp() {
-        fetcher = new OkHttpIndustryFetcher();
+        fetcher = new ThsIndustryFetcher();
         // 注入测试配置（反射设置私有字段）
         setField(fetcher, "retryCount", 2);
         setField(fetcher, "requestDelayMin", 10);
@@ -253,24 +253,13 @@ class OkHttpIndustryFetcherTest {
             assertThat(delay).isBetween(10L, 20L); // 测试配置范围
         }
 
-        @Test
-        @DisplayName("isBlocked检测403/429/封禁关键词")
-        void detectsBlockedResponse() {
-            assertThat(invokeIsBlocked("403 Forbidden")).isTrue();
-            assertThat(invokeIsBlocked("429 Too Many Requests")).isTrue();
-            assertThat(invokeIsBlocked("访问过于频繁")).isTrue();
-            assertThat(invokeIsBlocked("IP已被封禁")).isTrue();
-            assertThat(invokeIsBlocked("chameleon")).isTrue();
-            assertThat(invokeIsBlocked("<html>正常数据</html>")).isFalse();
-            assertThat(invokeIsBlocked("var JS_DATA = [...]")).isFalse();
-        }
     }
 
     // ===================== 反射辅助方法 =====================
 
     private List<IndustryFlowData> invokeParseHtmlTable(String html) {
         try {
-            var method = OkHttpIndustryFetcher.class.getDeclaredMethod("parseHtmlTable", String.class);
+            var method = ThsIndustryFetcher.class.getDeclaredMethod("parseHtmlTable", String.class);
             method.setAccessible(true);
             @SuppressWarnings("unchecked")
             List<IndustryFlowData> result = (List<IndustryFlowData>) method.invoke(fetcher, html);
@@ -282,7 +271,7 @@ class OkHttpIndustryFetcherTest {
 
     private java.util.Map<String, String> invokeParseJsData(String html) {
         try {
-            var method = OkHttpIndustryFetcher.class.getDeclaredMethod("parseJsData", String.class);
+            var method = ThsIndustryFetcher.class.getDeclaredMethod("parseJsData", String.class);
             method.setAccessible(true);
             @SuppressWarnings("unchecked")
             var result = (java.util.Map<String, String>) method.invoke(fetcher, html);
@@ -294,7 +283,7 @@ class OkHttpIndustryFetcherTest {
 
     private IndustryCapitalFlowEntity invokeConvertToEntity(IndustryFlowData data, LocalDate tradeDate) {
         try {
-            var method = OkHttpIndustryFetcher.class.getDeclaredMethod("convertToEntity", IndustryFlowData.class, LocalDate.class);
+            var method = ThsIndustryFetcher.class.getDeclaredMethod("convertToEntity", IndustryFlowData.class, LocalDate.class);
             method.setAccessible(true);
             return (IndustryCapitalFlowEntity) method.invoke(fetcher, data, tradeDate);
         } catch (Exception e) {
@@ -304,7 +293,7 @@ class OkHttpIndustryFetcherTest {
 
     private String invokeGetRandomUserAgent() {
         try {
-            var method = OkHttpIndustryFetcher.class.getDeclaredMethod("getRandomUserAgent");
+            var method = ThsIndustryFetcher.class.getDeclaredMethod("getRandomUserAgent");
             method.setAccessible(true);
             return (String) method.invoke(fetcher);
         } catch (Exception e) {
@@ -314,7 +303,7 @@ class OkHttpIndustryFetcherTest {
 
     private long invokeCalculateDelay() {
         try {
-            var method = OkHttpIndustryFetcher.class.getDeclaredMethod("calculateDelay");
+            var method = ThsIndustryFetcher.class.getDeclaredMethod("calculateDelay");
             method.setAccessible(true);
             return (long) method.invoke(fetcher);
         } catch (Exception e) {
@@ -322,15 +311,6 @@ class OkHttpIndustryFetcherTest {
         }
     }
 
-    private boolean invokeIsBlocked(String html) {
-        try {
-            var method = OkHttpIndustryFetcher.class.getDeclaredMethod("isBlocked", String.class);
-            method.setAccessible(true);
-            return (boolean) method.invoke(fetcher, html);
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
 
     private void setField(Object target, String fieldName, Object value) {
         try {

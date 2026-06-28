@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Select, Card, Row, Col, Statistic, Space, Spin, message, Grid } from 'antd';
-import { ArrowUpOutlined, ArrowDownOutlined, LineChartOutlined } from '@ant-design/icons';
-import ReactECharts from 'echarts-for-react';
-import { fetchIndustries, fetchTrend, fetchHistory, wanToYi, formatAmount } from '../api';
+import { useState, useEffect, useCallback } from 'react';
+import { Select, Card, Row, Col, Statistic, Space, Spin, Button, message, Grid } from 'antd';
+import { ArrowUpOutlined, ArrowDownOutlined, LineChartOutlined, SyncOutlined } from '@ant-design/icons';
+import { fetchLatestFlow, fetchTrend, triggerTrendCalculate, wanToYi, formatAmount } from '../api';
 import type { IndustryFlowItem, TrendData } from '../api';
 
 const periodOptions = [
@@ -34,16 +33,16 @@ export default function TrendAnalysis() {
   const [selected, setSelected] = useState<string>('');
   const [period, setPeriod] = useState(22);
   const [trend, setTrend] = useState<TrendData | null>(null);
-  const [historyData, setHistoryData] = useState<IndustryFlowItem[]>([]);
   const [loading, setLoading] = useState(false);
+  const [calcLoading, setCalcLoading] = useState(false);
 
   useEffect(() => {
-    fetchIndustries()
+    fetchLatestFlow(40, 'net_amount')
       .then((res) => {
         if (res.success) {
-          const opts = res.data.map((name: string) => ({
-            label: name,
-            value: name,
+          const opts = res.data.map((d: IndustryFlowItem) => ({
+            label: d.industryName,
+            value: d.industryName,
           }));
           setIndustries(opts);
           if (opts.length > 0 && !selected) {
@@ -73,87 +72,26 @@ export default function TrendAnalysis() {
     }
   }, [selected, period]);
 
+  const handleCalcTrend = async () => {
+    setCalcLoading(true);
+    try {
+      const res = await triggerTrendCalculate();
+      if (res.success) {
+        message.success('趋势计算完成！');
+        loadTrend();
+      } else {
+        message.error('趋势计算失败：' + (res.message || '未知错误'));
+      }
+    } catch (err) {
+      message.error('趋势计算失败：' + (err as Error).message);
+    } finally {
+      setCalcLoading(false);
+    }
+  };
+
   useEffect(() => {
     loadTrend();
   }, [loadTrend]);
-
-  // 加载历史净额序列（用于折线图）
-  useEffect(() => {
-    if (!selected) return;
-    fetchHistory(selected, 60)
-      .then((res) => {
-        if (res.success) {
-          setHistoryData(res.data);
-        }
-      })
-      .catch(() => message.error('历史数据加载失败'));
-  }, [selected]);
-
-  // ECharts 折线图配置
-  const chartOption = useMemo(() => {
-    if (historyData.length === 0) return null;
-    const sorted = [...historyData].sort((a, b) => a.tradeDate.localeCompare(b.tradeDate));
-    const dates = sorted.map((d) => d.tradeDate.slice(5)); // MM-DD
-    const values = sorted.map((d) => d.netAmount / 10000); // 万元→亿元
-    const hasNeg = values.some((v) => v < 0);
-
-    return {
-      backgroundColor: 'transparent',
-      grid: { top: 15, right: 15, bottom: 25, left: 55 },
-      xAxis: {
-        type: 'category' as const,
-        data: dates,
-        axisLine: { lineStyle: { color: '#2a3a4f' } },
-        axisLabel: { color: '#8899aa', fontSize: 10, rotate: dates.length > 20 ? 45 : 0 },
-      },
-      yAxis: {
-        type: 'value' as const,
-        name: '亿元',
-        nameTextStyle: { color: '#8899aa', fontSize: 11 },
-        axisLine: { lineStyle: { color: '#2a3a4f' } },
-        axisLabel: { color: '#8899aa', fontSize: 10 },
-        splitLine: { lineStyle: { color: '#1a2a3f' } },
-      },
-      tooltip: {
-        trigger: 'axis' as const,
-        backgroundColor: '#1a2332',
-        borderColor: '#2a3a4f',
-        textStyle: { color: '#e8eaf0', fontSize: 12 },
-        formatter: (params: any) => {
-          const d = params[0];
-          const v = d.value as number;
-          const color = v >= 0 ? '#f5222d' : '#52c41a';
-          return `${d.name}<br/>净额: <span style="color:${color};font-weight:bold">${v.toFixed(2)}亿</span>`;
-        },
-      },
-      series: [
-        {
-          type: 'line' as const,
-          data: values,
-          smooth: true,
-          symbol: 'none' as const,
-          areaStyle: {
-            color: {
-              type: 'linear' as const,
-              x: 0, y: 0, x2: 0, y2: 1,
-              colorStops: [
-                { offset: 0, color: 'rgba(22, 119, 255, 0.25)' },
-                { offset: 1, color: 'rgba(22, 119, 255, 0.02)' },
-              ],
-            },
-          },
-          lineStyle: { color: '#1677ff', width: 2 },
-          itemStyle: { color: '#1677ff' },
-          markLine: hasNeg ? {
-            silent: true,
-            symbol: 'none' as const,
-            data: [{ yAxis: 0 }],
-            lineStyle: { color: '#3a4a5f', type: 'dashed' as const, width: 1 },
-          } : undefined,
-        },
-      ],
-    };
-  }, [historyData]);
 
   const trendSlopeYi = trend ? (trend.trendSlope / 10000).toFixed(4) : '0';
   const slopeVal = trend ? trend.trendSlope : 0;
@@ -180,6 +118,16 @@ export default function TrendAnalysis() {
           />
           <span style={{ color: '#8899aa', fontSize: 13 }}>周期</span>
           <Select value={period} options={periodOptions} onChange={setPeriod} style={{ width: 80 }} />
+          <Button
+            type="primary"
+            icon={<SyncOutlined />}
+            onClick={handleCalcTrend}
+            loading={calcLoading}
+            size="small"
+            style={{ background: '#1677ff', marginLeft: 'auto' }}
+          >
+            计算
+          </Button>
         </div>
 
         <Spin spinning={loading}>
@@ -264,14 +212,6 @@ export default function TrendAnalysis() {
                 </div>
               </div>
 
-              {/* 历史净额折线图 */}
-              {chartOption && (
-                <div className="trend-stat-card" style={{ marginTop: 10 }}>
-                  <div className="stat-title" style={{ marginBottom: 8 }}>历史净额走势（近60日）</div>
-                  <ReactECharts option={chartOption} style={{ height: 220 }} />
-                </div>
-              )}
-
               {/* 解读说明 */}
               <div style={{ marginTop: 8, padding: '10px 14px', background: '#141e2e', borderRadius: 6, borderLeft: '3px solid #1677ff' }}>
                 <div style={{ color: '#8899aa', fontSize: 12, lineHeight: 1.8 }}>
@@ -311,6 +251,15 @@ export default function TrendAnalysis() {
         />
         <span style={{ color: '#8899aa' }}>周期</span>
         <Select value={period} options={periodOptions} onChange={setPeriod} style={{ width: 120 }} />
+        <Button
+          type="primary"
+          icon={<SyncOutlined />}
+          onClick={handleCalcTrend}
+          loading={calcLoading}
+          style={{ background: '#1677ff', marginLeft: 'auto' }}
+        >
+          计算趋势
+        </Button>
       </div>
 
       <Spin spinning={loading}>
@@ -431,17 +380,6 @@ export default function TrendAnalysis() {
                 </Col>
               </Row>
             </Card>
-
-            {/* 历史净额折线图 */}
-            {chartOption && (
-              <Card
-                title={<span style={{ color: '#8899aa', fontSize: 14 }}>历史净额走势（近60日）</span>}
-                style={{ ...cardStyle, marginTop: 16 }}
-                styles={{ body: { ...cardBodyStyle, padding: '12px 16px' } }}
-              >
-                <ReactECharts option={chartOption} style={{ height: 300 }} />
-              </Card>
-            )}
 
             <div style={{ marginTop: 16, padding: '12px 16px', background: '#141e2e', borderRadius: 6, borderLeft: '3px solid #1677ff' }}>
               <div style={{ color: '#8899aa', fontSize: 13, lineHeight: 2 }}>

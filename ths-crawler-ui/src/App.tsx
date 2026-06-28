@@ -4,10 +4,12 @@ import {
   BarChartOutlined,
   LineChartOutlined,
   ThunderboltOutlined,
+  CalendarOutlined,
 } from '@ant-design/icons';
 import FlowRanking from './pages/FlowRanking';
 import TrendAnalysis from './pages/TrendAnalysis';
 import ResonanceSignal from './pages/ResonanceSignal';
+import TradeCalendar from './pages/TradeCalendar';
 import './App.css';
 
 const { Header, Content, Footer } = Layout;
@@ -16,6 +18,7 @@ const menuItems = [
   { key: '/', icon: <BarChartOutlined />, label: '排行' },
   { key: '/trend', icon: <LineChartOutlined />, label: '趋势' },
   { key: '/resonance', icon: <ThunderboltOutlined />, label: '共振' },
+  { key: '/calendar', icon: <CalendarOutlined />, label: '交易日历' },
 ];
 
 /** 桌面端：顶部Header导航 */
@@ -72,6 +75,7 @@ function DesktopLayout() {
           <Route path="/" element={<FlowRanking />} />
           <Route path="/trend" element={<TrendAnalysis />} />
           <Route path="/resonance" element={<ResonanceSignal />} />
+          <Route path="/calendar" element={<TradeCalendar />} />
         </Routes>
       </Content>
     </Layout>
@@ -122,6 +126,7 @@ function MobileLayout() {
           <Route path="/" element={<FlowRanking />} />
           <Route path="/trend" element={<TrendAnalysis />} />
           <Route path="/resonance" element={<ResonanceSignal />} />
+          <Route path="/calendar" element={<TradeCalendar />} />
         </Routes>
       </Content>
 

@@ -116,6 +116,30 @@ public class DualWriteService {
                 .recordCount(recordCount)
                 .costMs(costMs)
                 .errorMsg(errorMsg)
+                .phase("total")
+                .retryCount(0)
+                .tradeDate(LocalDate.now())
+                .createdAt(LocalDateTime.now())
+                .build();
+        crawlLogMapper.insert(entity);
+    }
+
+    /**
+     * 记录抓取日志（增强版，支持 traceId/phase/retryCount）
+     */
+    public void logCrawlWithTrace(String traceId, String source, String status, String phase,
+                                   int recordCount, int rowsSaved, long costMs,
+                                   int retryCount, String detail, String errorMsg) {
+        CrawlLogEntity entity = CrawlLogEntity.builder()
+                .traceId(traceId)
+                .source(source)
+                .status(status)
+                .phase(phase)
+                .recordCount(recordCount)
+                .costMs(costMs)
+                .detail(detail)
+                .retryCount(retryCount)
+                .errorMsg(errorMsg)
                 .tradeDate(LocalDate.now())
                 .createdAt(LocalDateTime.now())
                 .build();

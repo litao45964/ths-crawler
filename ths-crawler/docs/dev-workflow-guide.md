@@ -1,6 +1,6 @@
 # ths-crawler 开发协作链路与踩坑总结
 
-> 2026-06-23 春风 & 小伍 共同整理 · 2026-06-23 v2更新（SSH/固定隧道/Flyway就绪后大幅修订）
+> 2026-06-23 春风 & 小伍 共同整理 · 2026-06-27 v3更新（SSH/固定隧道/Flyway就绪后大幅修订）
 
 ---
 
@@ -41,11 +41,14 @@
 
 ### 推荐开发流程（v2简化版）
 
-0. **沙箱崩溃/重启？** → `git clone git@github.com:litao45964/ths-crawler.git` 从GitHub拉代码基线（铁律：代码不从项目空间拼凑；非代码文件如不在GitHub可从项目空间获取）
-1. **沙箱写文件** → 任何类型的文件编写和修改都在沙箱完成（铁律：云电脑不做生产）
-2. **沙箱push到GitHub** → 先保命再留档（铁律：编译通过后先push GitHub，再上传项目空间）
-3. **沙箱上传到项目空间** → 留档备查
-4. **云电脑git pull** → 需要时才拉，按需更新
+0. **开发前 git pull 同步** → 任何开发任务，动手前先从 GitHub 拉最新代码（铁律⑰：避免忽略已提交修改、重复劳动、版本混乱）
+1. **沙箱崩溃/重启？** → `git clone git@github.com:litao45964/ths-crawler.git` 从GitHub拉代码基线（铁律④：代码不从项目空间拼凑；非代码文件如不在GitHub可从项目空间获取）
+2. **沙箱写文件** → 任何类型的文件编写和修改都在沙箱完成（铁律①：云电脑不做生产，沙箱是唯一代码生产车间）
+3. **沙箱编译验证** → `mvn compile` 通过（铁律②：编译是唯一真相）
+4. **沙箱push到GitHub** → 先保命再留档（铁律②：编译通过后先push GitHub，再上传项目空间）
+5. **沙箱write到项目空间** → 留档备查（铁律⑤：路径与GitHub仓库结构一致）
+6. **云电脑git pull** → 需要时才拉，按需更新
+7. **云电脑编译部署** → `ths-service.sh restart` 验证
 > ⚡ **关键变化**：云电脑不再从项目空间download文件，也不直接编辑任何文件，所有变更通过 `git pull` 获取——云电脑只做消费不做生产。
 
 ---
@@ -85,23 +88,27 @@
 ## 四、各环境操作铁律
 
 ### 沙箱铁律
-- ✅ **所有文件的编写和修改**（不分代码/文档/脚本/SQL/配置）必须在沙箱完成，禁止在云电脑直接编辑任何文件
-- ✅ 编译通过后**先push GitHub再上传项目空间**（铁律：GitHub是保命线，先保命再留档）
-- ✅ GitHub推送范围：影响编译/部署/运行的文件必须push；临时分析/踩坑复盘/用户上传数据留项目空间即可。判断标准：沙箱崩了没这个文件就无法恢复工作 → 必须push
-- ✅ 已push到GitHub的文件，后续每次更新必须同步push，不能只更新项目空间不同步GitHub（兜底：保持GitHub版本不落后）
-- ✅ 上传文件到项目空间（coze CLI upload/write）
+- ✅ **所有文件的编写和修改**（不分代码/文档/脚本/SQL/配置）必须在沙箱完成，禁止在云电脑直接编辑任何文件（铁律①）
+- ✅ 编译通过后**先push GitHub再上传项目空间**（铁律②：GitHub是保命线，先保命再留档）
+- ✅ GitHub推送范围：影响编译/部署/运行的文件必须push；临时分析/踩坑复盘/用户上传数据留项目空间即可。判断标准：沙箱崩了没这个文件就无法恢复工作 → 必须push（铁律③）
+- ✅ 已push到GitHub的文件，后续每次更新必须同步push，不能只更新项目空间不同步GitHub（铁律⑱：保持GitHub版本不落后）
+- ✅ 开发前必须先 git pull 同步最新代码（铁律⑰：避免忽略已提交修改、重复劳动、版本混乱）
+- ✅ 上传文件到项目空间（coze CLI write），路径与GitHub仓库结构一致（铁律⑤）
 - ✅ git push到GitHub（SSH over 443，稳定）
-- ✅ 崩溃/重启后从GitHub拉取代码基线（git clone，唯一代码源）
+- ✅ 崩溃/重启后从GitHub拉取代码基线（铁律④：git clone，唯一代码源）
+- ✅ 问题诊断优先静态代码分析，修复验证优先单元测试（铁律⑧）
+- ✅ 非任务范围问题不顺手修，先报告用户再决定（铁律⑨）
 - ❌ 不要跑长期服务（重启丢失）
 - ❌ 不要从项目空间download/read拼凑代码（太慢+缓存问题+版本不确定）
 - ⚠️ 非代码文件（用户上传/纯文档/临时分析）如果不在GitHub里，可从项目空间获取
 
 ### 云电脑铁律
-- ✅ git pull拿代码（SSH over 443，稳定）— **所有文件变更只通过git pull获取，不在云电脑直接编辑任何文件**
+- ✅ git pull拿代码（SSH over 443，稳定）— **所有文件变更只通过git pull获取，不在云电脑直接编辑任何文件**（铁律⑦）
 - ✅ 编译运行、部署服务、对外暴露
 - ✅ 访问同花顺（爬虫核心能力）
 - ✅ ths-service.sh管理服务生命周期
-- ❌ **禁止直接编辑任何文件**（不分代码/文档/脚本/SQL/配置），云电脑只做消费不做生产
+- ❌ **禁止直接编辑任何文件**（不分代码/文档/脚本/SQL/配置），云电脑只做消费不做生产（铁律①）
+- ❌ 场景E（紧急hotfix云电脑直改）已废弃，任何变更走沙箱→push→pull流程
 - ❌ sudo只能跑apt/dpkg，其他被禁
 - ❌ systemctl/service被禁，服务需nohup启动
 
@@ -109,11 +116,14 @@
 - ✅ 所有产出文件的持久留档
 - ✅ Agent工作目录的文件不跟项目走
 - ✅ `coze agent file write` 比 `upload` 更可靠（直接覆盖无缓存问题）
+- ✅ 非代码文件统一放 `/ths-crawler/docs/`，禁止放 `/docs/`（铁律⑪/⑫）
+- ✅ 同一文档只保留一个版本，变更走更新不走新建副本
 
 ### GitHub铁律
 - ✅ 代码分发中枢+版本控制+备份
 - ✅ SSH over 443，PAT存SECRET.md
 - ✅ Conventional Commits规范：feat/fix/refactor/docs/chore
+- ✅ 文档与代码同级管理，GitHub 是唯一靠谱基线
 
 ### 数据库变更铁律 🆕
 - ✅ 所有DDL变更走Flyway迁移脚本，禁止手动ALTER
@@ -121,6 +131,8 @@
 - ✅ 版本号格式：`V{YYYYMMDD}{序号}__{描述}.sql`
 - ✅ 云电脑git pull后重启应用，Flyway自动执行新迁移
 - ❌ 不要在云电脑手动改表结构（会跟Flyway基线冲突）
+- ✅ Flyway 已实际接入（V1-V5 全部迁移脚本），状态：✅ 已完成
+- ✅ 注意 MySQL 8.0 不支持 `ADD COLUMN IF NOT EXISTS`，直接 `ADD COLUMN`
 
 ---
 
@@ -155,19 +167,15 @@ mvn compile验证 → 上传项目空间+迁移脚本 → push GitHub →
 ### 场景D：纯前端功能
 
 ```
-沙箱写React代码 → 上传项目空间 → push GitHub →
+沙箱写React代码 → push GitHub → write项目空间 →
 云电脑 git pull → npm build → cp -r dist/* /var/www/ths-crawler/ →
 验证 https://ths.thsflow.xyz
 ```
 
-### 场景E：紧急hotfix（云电脑直改）
+### 场景E：紧急hotfix（云电脑直改）❌ 已废弃
 
-```
-云电脑vim改代码 → 编译验证 → ths-service.sh restart →
-git add + commit + push（补回GitHub）
-```
-
-⚠️ 此路径跳过沙箱和项目空间，改完务必push回GitHub保持同步
+> 此路径违反铁律①（禁止在云电脑直接编辑任何文件），已废弃。
+> 紧急hotfix 也应走沙箱→push→pull流程，宁可多2分钟，不留安全隐患。
 
 ---
 
@@ -218,7 +226,7 @@ cat /root/.cloudflared/config.yml            # 查看隧道配置
 | # | 事项 | 状态 | 说明 |
 |---|------|------|------|
 | 1 | 云电脑→沙箱文件通道 | ❌ 待解决 | 目前只能通过项目空间中转或GitHub |
-| 2 | Flyway实际接入 | 🔨 进行中 | 指南已写完，待添加依赖+迁移脚本+编译验证 |
+| 2 | Flyway实际接入 | ✅ 已完成 | V1-V5迁移脚本全部就绪，纳入git版本控制 |
 | 3 | Playwright浏览器自动化 | 🔜 下一步 | 云电脑已有Chrome 146，待开发90行业全覆盖爬取 |
 | 4 | dev-workflow-guide自动化 | 💡 远期 | 每次重大基础设施变更后自动提醒更新本文档 |
 
@@ -229,7 +237,7 @@ cat /root/.cloudflared/config.yml            # 查看隧道配置
 | 组件 | 配置 | 备注 |
 |------|------|------|
 | 云电脑公网IP | 49.233.146.84 | 安全组封锁，不可直连 |
-| 固定域名 | https://ths.thsflow.xyz | Cloudflare Tunnel → localhost:8080 |
+| 固定域名 | https://ths.thsflow.xyz | Cloudflare Tunnel `ths-crawler` → localhost:8080 |
 | Spring Boot | 端口8100 | Nginx反代8080→前端+8100→后端 |
 | MySQL | localhost:3306, root/root, ths_crawler库 | 5张表，105行数据 |
 | Redis | localhost:6379, 无密码 | 缓存层 |
@@ -239,8 +247,8 @@ cat /root/.cloudflared/config.yml            # 查看隧道配置
 
 ---
 
-*文档生成时间：2026-06-23 09:38*
-*v2更新时间：2026-06-23 23:52（铁律升级：云电脑禁止编辑任何文件，所有文件变更只通过git pull）*
+*文档生成时间：2026-06-23 09:38 · v3更新：2026-06-27 09:43*
+*v3更新时间：2026-06-27（铁律体系补全⑧-⑱ + Flyway已接入 + 场景E废弃 + 文档版本统一）*
 
 ---
 
