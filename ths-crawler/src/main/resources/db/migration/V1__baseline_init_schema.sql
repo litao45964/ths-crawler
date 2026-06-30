@@ -68,19 +68,18 @@ CREATE TABLE IF NOT EXISTS sector_capital_flow (
     KEY idx_net_amount (net_amount)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='板块资金流向表';
 
--- 表4: 爬取日志表
-CREATE TABLE IF NOT EXISTS crawl_log (
+-- 表4: 爬取日志表（与CrawlLogEntity对齐）
+CREATE TABLE IF NOT EXISTS ths_crawl_log (
     id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-    task_type VARCHAR(50) NOT NULL COMMENT '任务类型',
-    status VARCHAR(20) NOT NULL COMMENT '状态(running/success/failed)',
-    start_time DATETIME NOT NULL COMMENT '开始时间',
-    end_time DATETIME DEFAULT NULL COMMENT '结束时间',
-    rows_fetched INT DEFAULT 0 COMMENT '抓取行数',
-    rows_saved INT DEFAULT 0 COMMENT '保存行数',
+    source VARCHAR(50) NOT NULL COMMENT '数据源标识',
+    status VARCHAR(20) NOT NULL COMMENT '状态(SUCCESS/FAIL/PARTIAL)',
+    record_count INT DEFAULT 0 COMMENT '抓取记录数',
+    cost_ms BIGINT DEFAULT NULL COMMENT '耗时毫秒',
     error_msg TEXT DEFAULT NULL COMMENT '错误信息',
+    trade_date DATE DEFAULT NULL COMMENT '交易日期',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    KEY idx_task_type (task_type),
-    KEY idx_start_time (start_time)
+    KEY idx_source (source),
+    KEY idx_trade_date (trade_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='爬取日志表';
 
 -- 表5: 数据校验表
