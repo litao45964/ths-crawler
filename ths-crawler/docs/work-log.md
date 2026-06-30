@@ -29,6 +29,23 @@
 
 ---
 
+## 2026-06-30（周二）
+
+### 核心提炼
+
+1. iFinD金融数据技能全功能梳理：系统产出13操作全景分类（行情4+基本面2+选股基金3+工具4）+8个CLI调用模板范例（行情/K线/高频/财务指标/估值序列/智能选股/公告/代码转换）+4条使用铁律，建立项目数据源能力知识体系
+2. 同花顺金融数据手册五合一归档：5本iFinD参数手册（operations/parameters-basic/parameters-common/parameters-market/parameters-services）上传到项目空间 `/同花顺金融数据手册/`，为数据采集链路提供官方参数参考
+3. iFinD技能鉴权缺口确认：定位THS_API_KEY（JWT Token）为技能启用必要条件，待用户提供Token后解锁申万行业分类、智能选股等高级查询能力
+
+### 工作明细
+
+- [20:32] 【里程碑·P1】iFinD金融数据技能全功能梳理：13个操作分四类（行情类real-time-quotation/history-quotation/high-frequency/snap-shot；基本面类basic-data/date-sequence；选股基金类smart-stock-picking/fund-valuation/final-fund-valuation；工具类get-thscode/report-query/get-trade-dates/offset-trade-date/get-error-message），配套8个CLI调用模板范例覆盖完整投资分析场景，建立4条使用铁律（统一_cli_wrapper.py调用/指标名精确/JSON参数整体传/未收录指标不猜）
+- [21:13] 【里程碑·P1】同花顺金融数据手册上传项目空间：将iFinD技能本地references/下5本参数手册（operations.md操作索引/parameters-basic.md基础数据参数/parameters-common.md公共参数规范/parameters-market.md行情参数/parameters-services.md服务参数）归档到项目空间 `/同花顺金融数据手册/`，与ths-crawler项目数据采集共享官方参数参考
+- [21:43] 【卡点突破·P1】iFinD技能鉴权配置诊断：定位技能调用需要THS_API_KEY（同花顺iFinD HTTP API V2 JWT Token），当前未配置导致技能不可用，需用户提供Token后解锁完整查询能力
+
+---
+
+
 ## 2026-06-28（周日）
 
 ### 核心提炼
