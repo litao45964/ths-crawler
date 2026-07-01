@@ -31,13 +31,15 @@
     <insert id="batchInsertOrUpdate" parameterType="java.util.List">
         INSERT INTO industry_capital_flow
             (trade_date, industry_code, industry_name, industry_link, net_amount, inflow_amount,
-             outflow_amount, industry_change_pct, leading_stock, leading_stock_code, leading_stock_link, leading_stock_pct)
+             outflow_amount, industry_change_pct, leading_stock, leading_stock_code, leading_stock_link,
+             leading_stock_pct, created_at, updated_at)
         VALUES
         <foreach collection="list" item="item" separator=",">
             (#{item.tradeDate}, #{item.industryCode}, #{item.industryName},
              #{item.industryLink}, #{item.netAmount}, #{item.inflowAmount}, #{item.outflowAmount},
              #{item.industryChangePct}, #{item.leadingStock}, #{item.leadingStockCode},
-             #{item.leadingStockLink}, #{item.leadingStockPct})
+             #{item.leadingStockLink}, #{item.leadingStockPct},
+             IFNULL(#{item.createdAt}, NOW()), IFNULL(#{item.updatedAt}, NOW()))
         </foreach>
         ON DUPLICATE KEY UPDATE
             industry_code = VALUES(industry_code),
@@ -50,7 +52,7 @@
             leading_stock_code = VALUES(leading_stock_code),
             leading_stock_link = VALUES(leading_stock_link),
             leading_stock_pct = VALUES(leading_stock_pct),
-            updated_at = NOW()
+            updated_at = IFNULL(VALUES(updated_at), NOW())
     </insert>
 
     <!-- 查询指定日期的所有行业数据 -->

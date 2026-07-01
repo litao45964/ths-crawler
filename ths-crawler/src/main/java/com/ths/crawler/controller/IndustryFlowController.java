@@ -46,13 +46,30 @@ public class IndustryFlowController {
 
     /**
      * 手动补采指定日期数据
-     * POST /api/industry-flow/collect?date=2026-06-17
+     * POST /api/industry-flow/collect/{date}
      */
     @PostMapping("/collect/{date}")
     public ApiResponse<IndustryFlowService.CollectResult> manualCollect(@PathVariable String date) {
         log.info("手动补采行业资金流向: date={}", date);
         IndustryFlowService.CollectResult result = flowService.manualCollect(date);
         return ApiResponse.ok(result);
+    }
+
+    /**
+     * 从CSV文件导入行业资金流向数据
+     * POST /api/industry-flow/import-csv?filePath=/path/to/file.csv
+     *
+     * @param filePath CSV文件绝对路径
+     */
+    @PostMapping("/import-csv")
+    public ApiResponse<IndustryFlowService.CollectResult> importCsv(
+            @RequestParam String filePath) {
+        log.info("CSV导入行业资金流向: filePath={}", filePath);
+        IndustryFlowService.CollectResult result = flowService.importFromCsv(filePath);
+        if (result.isSuccess()) {
+            return ApiResponse.ok(result);
+        }
+        return ApiResponse.fail(result.getErrorMsg());
     }
 
     /**

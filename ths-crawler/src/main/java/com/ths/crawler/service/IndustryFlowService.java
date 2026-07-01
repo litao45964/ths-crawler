@@ -1,5 +1,9 @@
 package com.ths.crawler.service;
 
+import cn.hutool.core.text.csv.CsvData;
+import cn.hutool.core.text.csv.CsvReader;
+import cn.hutool.core.text.csv.CsvRow;
+import cn.hutool.core.text.csv.CsvUtil;
 import com.ths.crawler.core.DataFetcher;
 import com.ths.crawler.core.FetchContext;
 import com.ths.crawler.core.FetchResult;
@@ -12,8 +16,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
+import java.io.File;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -116,6 +124,109 @@ public class IndustryFlowService {
     public CollectResult manualCollect(String date) {
         log.info("手动补采行业资金流向: date={}", date);
         return collectDailyData();
+    }
+
+    /**
+     * 从CSV文件导入行业资金流向数据
+     * <p>
+     * CSV格式（无标题行，15列逗号分隔）：
+     * 序号,交易日期,行业代码,行业名称,行业URL,净额,流入额,流出额,涨跌幅,
+     * 领涨股,领涨股代码,领涨股URL,领涨股涨幅,抓取开始时间,抓取结束时间
+     *
+     * @param filePath CSV文件绝对路径
+     * @return 导入结果
+     */
+    public CollectResult importFromCsv(String filePath) {
+        long start = System.currentTimeMillis();
+        String traceId = UUID.randomUUID().toString().replace("-", "").substring(0, 16);
+        log.info("[traceId={}] === 开始CSV导入行业资金流向: file={} ===", traceId, filePath);
+
+        File csvFile = new File(filePath);
+        if (!csvFile.exists() || !csvFile.isFile()) {
+            log.error("[traceId={}] CSV文件不存在: {}", traceId, filePath);
+            return CollectResult.fail("CSV文件不存在: " + filePath);
+        }
+
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+
+        List<IndustryCapitalFlowEntity> allEntities = new ArrayList<>();
+        LocalDate minDate = null;
+        LocalDate maxDate = null;
+
+        try (CsvReader reader = CsvUtil.getReader()) {
+            CsvData csvData = reader.read(csvFile, StandardCharsets.UTF_8);
+            List<CsvRow> rows = csvData.getRows();
+
+            for (CsvRow row : rows) {
+                if (row.size() < 15) {
+                    log.warn("[traceId={}] 跳过列数不足的行: {}", traceId, row);
+                    continue;
+                }
+
+                try {
+                    String rawDate = row.get(1).trim();
+                    LocalDate tradeDate = LocalDate.parse(rawDate, dateFormatter);
+
+                    IndustryCapitalFlowEntity entity = IndustryCapitalFlowEntity.builder()
+                            .tradeDate(tradeDate)
+                            .industryCode(row.get(2).trim())
+                            .industryName(row.get(3).trim())
+                            .industryLink(row.get(4).trim())
+                            .netAmount(new BigDecimal(row.get(5).trim()))
+                            .inflowAmount(new BigDecimal(row.get(6).trim()))
+                            .outflowAmount(new BigDecimal(row.get(7).trim()))
+                            .industryChangePct(new BigDecimal(row.get(8).trim()))
+                            .leadingStock(row.get(9).trim())
+                            .leadingStockCode(row.get(10).trim())
+                            .leadingStockLink(row.get(11).trim())
+                            .leadingStockPct(new BigDecimal(row.get(12).trim()))
+                            .createdAt(LocalDateTime.parse(row.get(13).trim(), dateTimeFormatter))
+                            .updatedAt(LocalDateTime.parse(row.get(14).trim(), dateTimeFormatter))
+                            .build();
+
+                    allEntities.add(entity);
+
+                    if (minDate == null || tradeDate.isBefore(minDate)) {
+                        minDate = tradeDate;
+                    }
+                    if (maxDate == null || tradeDate.isAfter(maxDate)) {
+                        maxDate = tradeDate;
+                    }
+                } catch (Exception e) {
+                    log.warn("[traceId={}] 解析行数据失败: row={}, error={}", traceId, row, e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            log.error("[traceId={}] CSV读取失败", traceId, e);
+            return CollectResult.fail("CSV读取失败: " + e.getMessage());
+        }
+
+        if (allEntities.isEmpty()) {
+            log.warn("[traceId={}] CSV文件中无有效数据", traceId);
+            return CollectResult.fail("CSV文件中无有效数据");
+        }
+
+        // 分批入库（每批100条）
+        int totalRows = allEntities.size();
+        int inserted = 0;
+        int batchSize = 100;
+
+        for (int i = 0; i < allEntities.size(); i += batchSize) {
+            int end = Math.min(i + batchSize, allEntities.size());
+            List<IndustryCapitalFlowEntity> batch = allEntities.subList(i, end);
+            inserted += flowMapper.batchInsertOrUpdate(batch);
+        }
+
+        long costMs = System.currentTimeMillis() - start;
+        String dateRange = (minDate != null && maxDate != null)
+                ? minDate + "~" + maxDate
+                : "unknown";
+
+        log.info("[traceId={}] CSV导入完成: file={}, totalRows={}, inserted={}, dateRange={}, cost={}ms",
+                traceId, filePath, totalRows, inserted, dateRange, costMs);
+
+        return CollectResult.ok(totalRows, inserted, dateRange, costMs);
     }
 
     public List<IndustryFlowDTO> getLatestFlow(Integer topN, String orderBy) {

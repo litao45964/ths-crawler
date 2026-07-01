@@ -45,7 +45,7 @@ public class TrendStatService {
     private static final double MIN_SAMPLE_RATIO = 0.8;
 
     /** R²过滤阈值（模拟数据R²普遍偏低，真实数据可调高到0.3-0.4） */
-    private static final double R_SQUARED_THRESHOLD = 0.1;
+    private static final double R_SQUARED_THRESHOLD = 0.3;
 
     @Value("${ths.trend.min-sample-ratio:0.8}")
     private double minSampleRatio;
