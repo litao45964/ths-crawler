@@ -5,11 +5,13 @@ import {
   LineChartOutlined,
   ThunderboltOutlined,
   CalendarOutlined,
+  HistoryOutlined,
 } from '@ant-design/icons';
 import FlowRanking from './pages/FlowRanking';
 import TrendAnalysis from './pages/TrendAnalysis';
 import ResonanceSignal from './pages/ResonanceSignal';
 import TradeCalendar from './pages/TradeCalendar';
+import HistoryAnalysis from './pages/HistoryAnalysis';
 import './App.css';
 
 const { Header, Content, Footer } = Layout;
@@ -18,6 +20,7 @@ const menuItems = [
   { key: '/', icon: <BarChartOutlined />, label: '排行' },
   { key: '/trend', icon: <LineChartOutlined />, label: '趋势' },
   { key: '/resonance', icon: <ThunderboltOutlined />, label: '共振' },
+  { key: '/history', icon: <HistoryOutlined />, label: '历史对比' },
   { key: '/calendar', icon: <CalendarOutlined />, label: '交易日历' },
 ];
 
@@ -75,6 +78,7 @@ function DesktopLayout() {
           <Route path="/" element={<FlowRanking />} />
           <Route path="/trend" element={<TrendAnalysis />} />
           <Route path="/resonance" element={<ResonanceSignal />} />
+          <Route path="/history" element={<HistoryAnalysis />} />
           <Route path="/calendar" element={<TradeCalendar />} />
         </Routes>
       </Content>
@@ -126,6 +130,7 @@ function MobileLayout() {
           <Route path="/" element={<FlowRanking />} />
           <Route path="/trend" element={<TrendAnalysis />} />
           <Route path="/resonance" element={<ResonanceSignal />} />
+          <Route path="/history" element={<HistoryAnalysis />} />
           <Route path="/calendar" element={<TradeCalendar />} />
         </Routes>
       </Content>
