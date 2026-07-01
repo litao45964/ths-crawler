@@ -21,11 +21,14 @@ export interface IndustryFlowItem {
   tradeDate: string;
   industryCode: string;
   industryName: string;
+  industryLink: string;
   netAmount: number;
   inflowAmount: number;
   outflowAmount: number;
   industryChangePct: number;
   leadingStock: string;
+  leadingStockCode: string;
+  leadingStockLink: string;
   leadingStockPct: number;
   rank: number | null;
 }
@@ -72,7 +75,7 @@ export interface CollectResult {
 // ============ API 调用 ============
 
 /** 查询最新日度行业资金流向排行 */
-export async function fetchLatestFlow(topN = 10, orderBy = 'net_amount') {
+export async function fetchLatestFlow(topN = 40, orderBy = 'net_amount') {
   const res = await api.get<ApiResponse<IndustryFlowItem[]>>(
     '/api/industry-flow/latest',
     { params: { topN, orderBy } },

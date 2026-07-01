@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Select, Button, Table, DatePicker, message, Spin, Space, Grid } from 'antd';
+import { Select, Button, Table, DatePicker, message, Spin, Space, Grid, Switch } from 'antd';
 import { SyncOutlined, DownloadOutlined, HistoryOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import ReactECharts from 'echarts-for-react';
@@ -75,8 +75,9 @@ export default function FlowRanking() {
   const screens = Grid.useBreakpoint();
   const isMobile = !screens.md;
 
-  const [topN, setTopN] = useState(10);
+  const [topN, setTopN] = useState(40);
   const [orderBy, setOrderBy] = useState('net_amount');
+  const [sortAsc, setSortAsc] = useState(false); // false=流入最多, true=流出最多
   const [data, setData] = useState<IndustryFlowItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [collecting, setCollecting] = useState(false);
@@ -86,7 +87,8 @@ export default function FlowRanking() {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetchLatestFlow(topN, orderBy);
+      const actualOrderBy = sortAsc && orderBy === 'net_amount' ? 'net_amount_asc' : orderBy;
+      const res = await fetchLatestFlow(topN, actualOrderBy);
       if (res.success) {
         setData(res.data);
       }
@@ -95,7 +97,7 @@ export default function FlowRanking() {
     } finally {
       setLoading(false);
     }
-  }, [topN, orderBy]);
+  }, [topN, orderBy, sortAsc]);
 
   useEffect(() => {
     loadData();
@@ -212,6 +214,16 @@ export default function FlowRanking() {
       dataIndex: 'industryName',
       key: 'industryName',
       width: 120,
+      render: (v: string, record: IndustryFlowItem) => (
+        <a
+          href={record.industryLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: '#1677ff' }}
+        >
+          {v}
+        </a>
+      ),
     },
     {
       title: '净额(亿)',
@@ -254,6 +266,16 @@ export default function FlowRanking() {
       dataIndex: 'leadingStock',
       key: 'leadingStock',
       width: 100,
+      render: (v: string, record: IndustryFlowItem) => (
+        <a
+          href={record.leadingStockLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ color: '#1677ff' }}
+        >
+          {v}
+        </a>
+      ),
     },
     {
       title: '领涨股涨幅(%)',
@@ -281,6 +303,17 @@ export default function FlowRanking() {
             <span className="filter-label">排序</span>
             <Select value={orderBy} options={orderByOptions} onChange={setOrderBy} style={{ width: 90 }} />
           </div>
+          {orderBy === 'net_amount' && (
+            <div className="filter-item">
+              <Switch
+                size="small"
+                checked={sortAsc}
+                onChange={setSortAsc}
+                checkedChildren="流出"
+                unCheckedChildren="流入"
+              />
+            </div>
+          )}
           <Button
             type="primary"
             icon={<DownloadOutlined />}
@@ -331,6 +364,17 @@ export default function FlowRanking() {
           <Select value={topN} options={topNOptions} onChange={setTopN} style={{ width: 110 }} />
           <span style={{ color: '#8899aa' }}>排序方式</span>
           <Select value={orderBy} options={orderByOptions} onChange={setOrderBy} style={{ width: 110 }} />
+          {orderBy === 'net_amount' && (
+            <span style={{ color: '#8899aa', fontSize: 12 }}>
+              <Switch
+                size="small"
+                checked={sortAsc}
+                onChange={setSortAsc}
+                checkedChildren="流出最多"
+                unCheckedChildren="流入最多"
+              />
+            </span>
+          )}
         </Space>
         <Space>
           <DatePicker

@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Select, Card, Row, Col, Statistic, Space, Spin, Button, message, Grid } from 'antd';
 import { ArrowUpOutlined, ArrowDownOutlined, LineChartOutlined, SyncOutlined } from '@ant-design/icons';
-import { fetchLatestFlow, fetchTrend, triggerTrendCalculate, wanToYi, formatAmount } from '../api';
-import type { IndustryFlowItem, TrendData } from '../api';
+import { fetchIndustries, fetchTrend, triggerTrendCalculate, wanToYi, formatAmount } from '../api';
+import type { TrendData } from '../api';
 
 const periodOptions = [
   { label: '5天', value: 5 },
@@ -37,12 +37,12 @@ export default function TrendAnalysis() {
   const [calcLoading, setCalcLoading] = useState(false);
 
   useEffect(() => {
-    fetchLatestFlow(40, 'net_amount')
+    fetchIndustries()
       .then((res) => {
         if (res.success) {
-          const opts = res.data.map((d: IndustryFlowItem) => ({
-            label: d.industryName,
-            value: d.industryName,
+          const opts = res.data.map((name: string) => ({
+            label: name,
+            value: name,
           }));
           setIndustries(opts);
           if (opts.length > 0 && !selected) {

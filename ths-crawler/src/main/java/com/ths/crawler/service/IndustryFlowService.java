@@ -284,20 +284,27 @@ public class IndustryFlowService {
         if (orderBy == null || orderBy.isEmpty()) {
             orderBy = "net_amount";
         }
-        return switch (orderBy) {
+        // 支持 _asc 后缀，表示升序（去掉后缀后不复用 .reversed()）
+        boolean asc = false;
+        if (orderBy.endsWith("_asc")) {
+            asc = true;
+            orderBy = orderBy.replace("_asc", "");
+        }
+        Comparator<IndustryCapitalFlowEntity> cmp = switch (orderBy) {
             case "inflow_amount" -> Comparator.comparing(
                     IndustryCapitalFlowEntity::getInflowAmount,
-                    Comparator.nullsLast(BigDecimal::compareTo)).reversed();
+                    Comparator.nullsLast(BigDecimal::compareTo));
             case "outflow_amount" -> Comparator.comparing(
                     IndustryCapitalFlowEntity::getOutflowAmount,
-                    Comparator.nullsLast(BigDecimal::compareTo)).reversed();
+                    Comparator.nullsLast(BigDecimal::compareTo));
             case "industry_change_pct" -> Comparator.comparing(
                     IndustryCapitalFlowEntity::getIndustryChangePct,
-                    Comparator.nullsLast(BigDecimal::compareTo)).reversed();
+                    Comparator.nullsLast(BigDecimal::compareTo));
             default -> Comparator.comparing(
                     IndustryCapitalFlowEntity::getNetAmount,
-                    Comparator.nullsLast(BigDecimal::compareTo)).reversed();
+                    Comparator.nullsLast(BigDecimal::compareTo));
         };
+        return asc ? cmp : cmp.reversed();
     }
 
     @lombok.Data

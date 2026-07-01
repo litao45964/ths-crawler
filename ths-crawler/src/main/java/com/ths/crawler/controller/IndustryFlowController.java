@@ -81,7 +81,7 @@ public class IndustryFlowController {
      */
     @GetMapping("/latest")
     public ApiResponse<List<IndustryFlowDTO>> getLatest(
-            @RequestParam(defaultValue = "10") Integer topN,
+            @RequestParam(defaultValue = "40") Integer topN,
             @RequestParam(defaultValue = "net_amount") String orderBy) {
         log.info("查询最新行业资金流向: topN={}, orderBy={}", topN, orderBy);
         List<IndustryFlowDTO> list = flowService.getLatestFlow(topN, orderBy);

@@ -188,7 +188,16 @@ export default function HistoryAnalysis() {
         dataIndex: 'industryName',
         width: 100,
         fixed: isMobile ? undefined : 'left',
-        render: (v: string) => <Tag color="blue">{v}</Tag>,
+        render: (v: string, record: IndustryFlowItem) => (
+          <a
+            href={record.industryLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1677ff' }}
+          >
+            <Tag color="blue">{v}</Tag>
+          </a>
+        ),
       },
       {
         title: '日期',
@@ -241,6 +250,16 @@ export default function HistoryAnalysis() {
         dataIndex: 'leadingStock',
         width: 100,
         responsive: ['md'],
+        render: (v: string, record: IndustryFlowItem) => (
+          <a
+            href={record.leadingStockLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: '#1677ff' }}
+          >
+            {v}
+          </a>
+        ),
       },
       {
         title: '领涨涨幅',
