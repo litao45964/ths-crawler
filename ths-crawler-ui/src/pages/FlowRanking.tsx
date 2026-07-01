@@ -31,7 +31,14 @@ function MobileFlowCard({ item, index }: { item: IndustryFlowItem; index: number
           <span className={`rank-badge ${isTop3 ? 'top3' : 'normal'}`}>
             {index + 1}
           </span>
-          <span className="industry-name">{item.industryName}</span>
+          <a
+            href={item.industryLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="industry-name"
+          >
+            {item.industryName}
+          </a>
         </div>
         <span style={{ fontSize: 16, fontWeight: 700, color: netFmt.color }}>
           {netFmt.text}亿
@@ -54,14 +61,20 @@ function MobileFlowCard({ item, index }: { item: IndustryFlowItem; index: number
         </div>
         <div className="stat-item">
           <span className="stat-label">领涨股</span>
-          <span className="stat-value" style={{ color: '#e8eaf0', fontSize: 13 }}>
+          <a
+            href={item.leadingStockLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="stat-value"
+            style={{ color: '#e8eaf0', fontSize: 13 }}
+          >
             {item.leadingStock}
             {item.leadingStockPct !== 0 && (
               <span style={{ color: formatPct(item.leadingStockPct).color, marginLeft: 4, fontSize: 12 }}>
                 {formatPct(item.leadingStockPct).text}
               </span>
             )}
-          </span>
+          </a>
         </div>
       </div>
       <div className="card-footer">

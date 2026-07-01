@@ -41,16 +41,12 @@ public class TrendStatService {
     /** 预设统计周期 */
     private static final int[] STAT_PERIODS = {5, 10, 14, 22, 30, 60};
 
-    /** 有效样本最低比例（周期 × 0.8） */
-    private static final double MIN_SAMPLE_RATIO = 0.8;
-
-    /** R²过滤阈值（模拟数据R²普遍偏低，真实数据可调高到0.3-0.4） */
-    private static final double R_SQUARED_THRESHOLD = 0.3;
-
-    @Value("${ths.trend.min-sample-ratio:0.8}")
+    /** 有效样本最低比例（周期 × ratio），真实数据建议 0.5-0.6，数据量充足后可调回 0.8 */
+    @Value("${ths.trend.min-sample-ratio:0.5}")
     private double minSampleRatio;
 
-    @Value("${ths.trend.r-squared-threshold:0.1}")
+    /** R² 过滤阈值（共振信号使用），模拟数据 0.1，真实数据建议 0.3-0.4 */
+    @Value("${ths.trend.r-squared-threshold:0.3}")
     private double rSquaredThreshold;
 
     /**
