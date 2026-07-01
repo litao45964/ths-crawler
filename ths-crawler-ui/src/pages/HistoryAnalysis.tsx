@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Select, Button, Table, message, Spin, Grid, Card, Tag, Empty } from 'antd';
+import { Select, Button, Table, message, Spin, Grid, Card, Tag, Empty, Tabs } from 'antd';
 import { SearchOutlined } from '@ant-design/icons';
 import ReactECharts from 'echarts-for-react';
 import type { ColumnsType, FilterValue } from 'antd/es/table/interface';
@@ -36,6 +36,7 @@ export default function HistoryAnalysis() {
   const [loading, setLoading] = useState(false);
   // allData: 行业名称 → 该行业的历史数据数组
   const [allData, setAllData] = useState<Map<string, IndustryFlowItem[]>>(new Map());
+  const [activeTab, setActiveTab] = useState<string>('trend');
 
   // 加载行业列表
   useEffect(() => {
@@ -96,6 +97,15 @@ export default function HistoryAnalysis() {
       handleQuery();
     }
   }, [selected.length, days]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 全选/取消全选
+  const handleSelectAll = useCallback(() => {
+    if (selected.length === industries.length) {
+      setSelected([]);
+    } else {
+      setSelected([...industries]);
+    }
+  }, [selected, industries]);
 
   // ---- ECharts 配置 ----
   const chartOption = useMemo(() => {
@@ -179,6 +189,106 @@ export default function HistoryAnalysis() {
       series,
     } as any;
   }, [allData]);
+
+  // ---- 区间统计：每个行业的净额合计 ----
+  const periodStats = useMemo(() => {
+    const stats: { name: string; totalNet: number; dayCount: number; avgNet: number; maxNet: number; minNet: number }[] = [];
+    allData.forEach((items, name) => {
+      if (items.length === 0) return;
+      const nets = items.map((d) => d.netAmount);
+      const total = nets.reduce((a, b) => a + b, 0);
+      const max = Math.max(...nets);
+      const min = Math.min(...nets);
+      stats.push({
+        name,
+        totalNet: total,
+        dayCount: items.length,
+        avgNet: total / items.length,
+        maxNet: max,
+        minNet: min,
+      });
+    });
+    stats.sort((a, b) => b.totalNet - a.totalNet); // 按合计降序
+    return stats;
+  }, [allData]);
+
+  // ---- 区间统计柱状图 ----
+  const barChartOption = useMemo(() => {
+    if (periodStats.length === 0) return null;
+    const names = periodStats.map((s) => s.name);
+    const values = periodStats.map((s) => s.totalNet);
+    const colors = values.map((v) => (v >= 0 ? '#f5222d' : '#52c41a'));
+
+    return {
+      ...darkTheme,
+      legend: { show: false },
+      tooltip: {
+        ...darkTheme.tooltip,
+        trigger: 'axis' as const,
+        axisPointer: { type: 'shadow' as const },
+        formatter: (params: any) => {
+          const p = Array.isArray(params) ? params[0] : params;
+          if (!p) return '';
+          const idx = p.dataIndex;
+          const stat = periodStats[idx];
+          if (!stat) return '';
+          const color = stat.totalNet >= 0 ? '#f5222d' : '#52c41a';
+          return `<div style="font-weight:600;margin-bottom:4px">${stat.name}</div>
+            <div>区间净额: <span style="color:${color};font-weight:600">${(stat.totalNet / 10000).toFixed(2)} 亿</span></div>
+            <div>交易日: ${stat.dayCount} 天</div>
+            <div>日均: ${(stat.avgNet / 10000).toFixed(2)} 亿</div>`;
+        },
+      },
+      xAxis: {
+        ...darkTheme.xAxis,
+        type: 'category',
+        data: names,
+        axisLabel: {
+          ...darkTheme.xAxis?.axisLabel,
+          rotate: names.length > 10 ? 45 : 0,
+          interval: 0,
+        },
+      },
+      yAxis: {
+        ...darkTheme.yAxis,
+        type: 'value',
+        name: '净额（万元）',
+        axisLabel: {
+          ...darkTheme.yAxis?.axisLabel,
+          formatter: (v: number) => {
+            if (Math.abs(v) >= 10000) return (v / 10000).toFixed(1) + '亿';
+            return v.toString();
+          },
+        },
+      },
+      grid: { left: 80, right: 30, top: 10, bottom: names.length > 10 ? 70 : 50 },
+      series: [
+        {
+          type: 'bar',
+          data: values.map((v, i) => ({ value: v, itemStyle: { color: colors[i] } })),
+          barMaxWidth: 40,
+        },
+      ],
+    } as any;
+  }, [periodStats]);
+
+  // ---- 区间统计表格列 ----
+  const periodColumns: ColumnsType<typeof periodStats[number]> = useMemo(
+    () => [
+      { title: '行业', dataIndex: 'name', width: 100, render: (v: string) => <Tag color="blue">{v}</Tag> },
+      {
+        title: '区间净额(亿)', dataIndex: 'totalNet', width: 120, align: 'right' as const,
+        sorter: (a: any, b: any) => a.totalNet - b.totalNet,
+        defaultSortOrder: 'descend' as const,
+        render: (v: number) => { const f = formatAmount(v); return <span style={{ color: f.color, fontWeight: 600 }}>{f.text}</span>; },
+      },
+      { title: '交易日', dataIndex: 'dayCount', width: 80, align: 'center' as const },
+      { title: '日均(亿)', dataIndex: 'avgNet', width: 100, align: 'right' as const, render: (v: number) => (v / 10000).toFixed(2) },
+      { title: '最大单日(亿)', dataIndex: 'maxNet', width: 120, align: 'right' as const, render: (v: number) => { const f = formatAmount(v); return <span style={{ color: f.color }}>{f.text}</span>; }, responsive: ['md'] as any },
+      { title: '最小单日(亿)', dataIndex: 'minNet', width: 120, align: 'right' as const, render: (v: number) => { const f = formatAmount(v); return <span style={{ color: f.color }}>{f.text}</span>; }, responsive: ['md'] as any },
+    ],
+    [],
+  );
 
   // ---- 表格列定义 ----
   const columns: ColumnsType<IndustryFlowItem> = useMemo(
@@ -321,6 +431,9 @@ export default function HistoryAnalysis() {
         }
         notFoundContent="未匹配到行业"
       />
+      <Button type="link" size="small" onClick={handleSelectAll} style={{ padding: 0, whiteSpace: 'nowrap' }}>
+        {selected.length === industries.length ? '取消全选' : '全选'}
+      </Button>
       <Select
         style={{ width: 110 }}
         value={days}
@@ -384,13 +497,60 @@ export default function HistoryAnalysis() {
     )
   );
 
+  // ---- Tab 配置 ----
+  const tabItems = [
+    {
+      key: 'trend',
+      label: '走势对比',
+      children: (
+        <>
+          {chartArea}
+          {tableArea}
+        </>
+      ),
+    },
+    {
+      key: 'period',
+      label: '区间统计',
+      children: (
+        <>
+          {barChartOption && (
+            <Card style={{ marginBottom: 16 }} bodyStyle={{ padding: isMobile ? 8 : 16 }}>
+              <ReactECharts
+                option={barChartOption}
+                style={{ height: isMobile ? 280 : 400 }}
+                theme="dark"
+                opts={{ renderer: 'canvas' }}
+              />
+            </Card>
+          )}
+          {periodStats.length > 0 ? (
+            <Card bodyStyle={{ padding: isMobile ? 8 : 16 }}>
+              <Table<typeof periodStats[number]>
+                columns={periodColumns}
+                dataSource={periodStats}
+                rowKey="name"
+                size={isMobile ? 'small' : 'middle'}
+                pagination={{ pageSize: isMobile ? 15 : 20, showSizeChanger: true, showTotal: (t: number) => `共 ${t} 个行业` }}
+                scroll={{ x: isMobile ? 300 : 600 }}
+              />
+            </Card>
+          ) : (
+            !loading && (
+              <Card><Empty description="请选择行业并点击查询" /></Card>
+            )
+          )}
+        </>
+      ),
+    },
+  ];
+
   // ---- 页面渲染 ----
   return (
     <Spin spinning={loading}>
       <div style={{ padding: isMobile ? 4 : 0 }}>
         {controlBar}
-        {chartArea}
-        {tableArea}
+        <Tabs activeKey={activeTab} onChange={setActiveTab} items={tabItems} />
       </div>
     </Spin>
   );

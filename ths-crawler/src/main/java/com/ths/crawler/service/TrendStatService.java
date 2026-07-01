@@ -16,7 +16,9 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 
@@ -270,6 +272,13 @@ public class TrendStatService {
         }
 
         List<TrendResonanceDTO> results = new ArrayList<>();
+
+        // 从flow表构建行业→链接的映射
+        Map<String, String> industryLinkMap = new HashMap<>();
+        List<IndustryCapitalFlowEntity> latestFlowData = flowMapper.selectByTradeDate(tradeDate);
+        for (IndustryCapitalFlowEntity e : latestFlowData) {
+            industryLinkMap.put(e.getIndustryName(), e.getIndustryLink());
+        }
         AtomicInteger skipNullCount = new AtomicInteger(0);
         AtomicInteger skipR2Count = new AtomicInteger(0);
         AtomicInteger errorCount2 = new AtomicInteger(0);
@@ -322,6 +331,7 @@ public class TrendStatService {
 
                 TrendResonanceDTO dto = TrendResonanceDTO.builder()
                         .industryName(industryName)
+                        .industryLink(industryLinkMap.getOrDefault(industryName, ""))
                         .tradeDate(tradeDate)
                         .shortPeriod(shortPeriod)
                         .longPeriod(longPeriod)

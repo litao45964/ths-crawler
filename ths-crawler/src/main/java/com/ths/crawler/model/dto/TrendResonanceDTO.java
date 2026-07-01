@@ -20,6 +20,9 @@ public class TrendResonanceDTO {
     /** 行业名称 */
     private String industryName;
 
+    /** 行业页面链接 */
+    private String industryLink;
+
     /** 交易日期 */
     private LocalDate tradeDate;
 

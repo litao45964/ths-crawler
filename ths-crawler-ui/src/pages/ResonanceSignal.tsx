@@ -73,7 +73,9 @@ function MobileResonanceCard({ item, cfg }: { item: ResonanceItem; cfg: (typeof 
   return (
     <div className="mobile-resonance-card" style={{ background: cfg.bgColor, border: `1px solid ${cfg.borderColor}` }}>
       <div className="signal-header">
-        <span style={{ color: cfg.color, fontSize: 15, fontWeight: 700 }}>{item.industryName}</span>
+        <a href={item.industryLink} target="_blank" rel="noopener noreferrer" style={{ color: cfg.color, fontSize: 15, fontWeight: 700 }}>
+          {item.industryName}
+        </a>
         <Tag color={cfg.tagColor} style={{ margin: 0, fontSize: 11 }}>{cfg.desc}</Tag>
       </div>
       <div className="signal-stats">
@@ -162,7 +164,9 @@ export default function ResonanceSignal() {
         styles={{ body: { padding: isMobile ? 12 : 16 } }}
       >
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-          <span style={{ color: cfg.color, fontSize: 16, fontWeight: 700 }}>{item.industryName}</span>
+          <a href={item.industryLink} target="_blank" rel="noopener noreferrer" style={{ color: cfg.color, fontSize: 16, fontWeight: 700 }}>
+            {item.industryName}
+          </a>
           <Tag color={cfg.tagColor} style={{ margin: 0 }}>
             {cfg.desc}
           </Tag>

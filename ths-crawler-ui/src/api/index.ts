@@ -51,6 +51,7 @@ export interface TrendData {
 
 export interface ResonanceItem {
   industryName: string;
+  industryLink: string;
   tradeDate: string;
   shortPeriod: number;
   longPeriod: number;
