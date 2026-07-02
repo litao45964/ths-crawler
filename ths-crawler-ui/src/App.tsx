@@ -1,33 +1,51 @@
-import { BrowserRouter, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ConfigProvider, theme, Layout, Menu, Grid } from 'antd';
 import {
+  HomeOutlined,
   BarChartOutlined,
-  LineChartOutlined,
-  ThunderboltOutlined,
-  CalendarOutlined,
-  HistoryOutlined,
+  ToolOutlined,
+  UserOutlined,
+  MenuOutlined,
 } from '@ant-design/icons';
-import FlowRanking from './pages/FlowRanking';
-import TrendAnalysis from './pages/TrendAnalysis';
-import ResonanceSignal from './pages/ResonanceSignal';
-import TradeCalendar from './pages/TradeCalendar';
-import HistoryAnalysis from './pages/HistoryAnalysis';
+import Home from './pages/Home';
+import FundFlowLayout from './components/FundFlowLayout';
+import Tools from './pages/Tools';
+import Mine from './pages/Mine';
+import HamburgerDrawer from './components/HamburgerDrawer';
 import './App.css';
 
 const { Header, Content, Footer } = Layout;
 
-const menuItems = [
-  { key: '/', icon: <BarChartOutlined />, label: '排行' },
-  { key: '/trend', icon: <LineChartOutlined />, label: '趋势' },
-  { key: '/resonance', icon: <ThunderboltOutlined />, label: '共振' },
-  { key: '/history', icon: <HistoryOutlined />, label: '历史对比' },
-  { key: '/calendar', icon: <CalendarOutlined />, label: '交易日历' },
+/** 一级导航：4个核心Tab */
+const primaryTabs = [
+  { key: '/', icon: <HomeOutlined />, label: '首页' },
+  { key: '/fund-flow', icon: <BarChartOutlined />, label: '资金分析' },
+  { key: '/tools', icon: <ToolOutlined />, label: '工具' },
+  { key: '/mine', icon: <UserOutlined />, label: '我的' },
 ];
 
-/** 桌面端：顶部Header导航 */
-function DesktopLayout() {
+/** 移动端 Header 标题映射 */
+const headerTitles: Record<string, string> = {
+  '/': '市场概览',
+  '/fund-flow': '行业资金流向',
+  '/tools': '决策工具',
+  '/mine': '个人中心',
+};
+
+/** 根据当前路径获取匹配的一级Tab key */
+function getActivePrimaryKey(pathname: string): string {
+  if (pathname.startsWith('/fund-flow')) return '/fund-flow';
+  if (pathname.startsWith('/tools')) return '/tools';
+  if (pathname.startsWith('/mine')) return '/mine';
+  return '/';
+}
+
+/** ==================== 桌面端布局 ==================== */
+function DesktopLayout({ onOpenDrawer }: { onOpenDrawer: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const activeKey = getActivePrimaryKey(location.pathname);
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#0d1520' }}>
@@ -41,6 +59,7 @@ function DesktopLayout() {
           height: 56,
         }}
       >
+        {/* Logo */}
         <div
           style={{
             color: '#e8eaf0',
@@ -53,10 +72,12 @@ function DesktopLayout() {
         >
           同花顺行业资金流向分析
         </div>
+
+        {/* 一级导航菜单 */}
         <Menu
           mode="horizontal"
-          selectedKeys={[location.pathname]}
-          items={menuItems}
+          selectedKeys={[activeKey]}
+          items={primaryTabs}
           onClick={({ key }) => navigate(key)}
           style={{
             flex: 1,
@@ -65,40 +86,75 @@ function DesktopLayout() {
           }}
           theme="dark"
         />
+
+        {/* 汉堡按钮 */}
+        <div
+          onClick={onOpenDrawer}
+          className="hamburger-btn"
+          style={{
+            cursor: 'pointer',
+            fontSize: 20,
+            color: '#8899aa',
+            padding: '4px 8px',
+          }}
+        >
+          <MenuOutlined />
+        </div>
       </Header>
 
+      {/* 页面内容 */}
       <Content
         style={{
           padding: '20px 28px',
           background: '#0d1520',
-          minHeight: 'calc(100vh - 56px)',
+          minHeight: 'calc(100vh - 56px - 32px)',
         }}
       >
         <Routes>
-          <Route path="/" element={<FlowRanking />} />
-          <Route path="/trend" element={<TrendAnalysis />} />
-          <Route path="/resonance" element={<ResonanceSignal />} />
-          <Route path="/history" element={<HistoryAnalysis />} />
-          <Route path="/calendar" element={<TradeCalendar />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/fund-flow/*" element={<FundFlowLayout />} />
+          <Route path="/tools" element={<Tools />} />
+          <Route path="/mine" element={<Mine />} />
+          {/* 旧路由重定向，不破坏书签 */}
+          <Route path="/trend" element={<Navigate to="/fund-flow/trend" replace />} />
+          <Route path="/resonance" element={<Navigate to="/fund-flow/resonance" replace />} />
+          <Route path="/history" element={<Navigate to="/fund-flow/history" replace />} />
+          <Route path="/calendar" element={<Navigate to="/fund-flow/calendar" replace />} />
         </Routes>
       </Content>
+
+      {/* 底部版权 */}
+      <Footer
+        style={{
+          textAlign: 'center',
+          background: '#0d1520',
+          color: '#556677',
+          fontSize: 12,
+          padding: '8px 0',
+          borderTop: '1px solid #1e2d45',
+        }}
+      >
+        © 2026 ths-crawler · 数据来源：同花顺
+      </Footer>
     </Layout>
   );
 }
 
-/** 移动端：底部Tab导航 */
-function MobileLayout() {
+/** ==================== 移动端布局 ==================== */
+function MobileLayout({ onOpenDrawer }: { onOpenDrawer: () => void }) {
   const navigate = useNavigate();
   const location = useLocation();
+  const activeKey = getActivePrimaryKey(location.pathname);
+  const headerTitle = headerTitles[activeKey] || 'ths-crawler';
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#0d1520' }}>
-      {/* 移动端顶部标题栏 */}
+      {/* 顶部标题栏 + 汉堡按钮 */}
       <Header
         style={{
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center',
+          justifyContent: 'space-between',
           background: '#111a27',
           borderBottom: '1px solid #1e2d45',
           padding: '0 16px',
@@ -113,10 +169,24 @@ function MobileLayout() {
             letterSpacing: 1,
           }}
         >
-          行业资金流向
+          {headerTitle}
+        </div>
+
+        <div
+          onClick={onOpenDrawer}
+          className="hamburger-btn"
+          style={{
+            cursor: 'pointer',
+            fontSize: 20,
+            color: '#8899aa',
+            padding: '4px 8px',
+          }}
+        >
+          <MenuOutlined />
         </div>
       </Header>
 
+      {/* 页面内容 */}
       <Content
         style={{
           padding: '12px',
@@ -127,16 +197,21 @@ function MobileLayout() {
         }}
       >
         <Routes>
-          <Route path="/" element={<FlowRanking />} />
-          <Route path="/trend" element={<TrendAnalysis />} />
-          <Route path="/resonance" element={<ResonanceSignal />} />
-          <Route path="/history" element={<HistoryAnalysis />} />
-          <Route path="/calendar" element={<TradeCalendar />} />
+          <Route path="/" element={<Home />} />
+          <Route path="/fund-flow/*" element={<FundFlowLayout />} />
+          <Route path="/tools" element={<Tools />} />
+          <Route path="/mine" element={<Mine />} />
+          {/* 旧路由重定向 */}
+          <Route path="/trend" element={<Navigate to="/fund-flow/trend" replace />} />
+          <Route path="/resonance" element={<Navigate to="/fund-flow/resonance" replace />} />
+          <Route path="/history" element={<Navigate to="/fund-flow/history" replace />} />
+          <Route path="/calendar" element={<Navigate to="/fund-flow/calendar" replace />} />
         </Routes>
       </Content>
 
-      {/* 底部Tab栏 */}
+      {/* 底部固定一级Tab */}
       <Footer
+        className="primary-tab-bar"
         style={{
           position: 'fixed',
           bottom: 0,
@@ -150,16 +225,15 @@ function MobileLayout() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-around',
-          // 适配iPhone底部安全区
           paddingBottom: 'env(safe-area-inset-bottom, 0px)',
         }}
       >
-        {menuItems.map((item) => {
-          const isActive = location.pathname === item.key;
+        {primaryTabs.map((tab) => {
+          const isActive = activeKey === tab.key;
           return (
             <div
-              key={item.key}
-              onClick={() => navigate(item.key)}
+              key={tab.key}
+              onClick={() => navigate(tab.key)}
               style={{
                 display: 'flex',
                 flexDirection: 'column',
@@ -174,9 +248,9 @@ function MobileLayout() {
                 WebkitTapHighlightColor: 'transparent',
               }}
             >
-              <span style={{ fontSize: 20, marginBottom: 2 }}>{item.icon}</span>
+              <span style={{ fontSize: 20, marginBottom: 2 }}>{tab.icon}</span>
               <span style={{ fontSize: 11, fontWeight: isActive ? 600 : 400 }}>
-                {item.label}
+                {tab.label}
               </span>
             </div>
           );
@@ -186,14 +260,29 @@ function MobileLayout() {
   );
 }
 
-/** 根断点切换布局 */
+/** ==================== 根断点切换 + Drawer 状态管理 ==================== */
 function AppLayout() {
   const screens = Grid.useBreakpoint();
-  const isMobile = !screens.md; // md=768px，小于768视为移动端
+  const isMobile = !screens.md;
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
-  return isMobile ? <MobileLayout /> : <DesktopLayout />;
+  return (
+    <>
+      {isMobile ? (
+        <MobileLayout onOpenDrawer={() => setDrawerOpen(true)} />
+      ) : (
+        <DesktopLayout onOpenDrawer={() => setDrawerOpen(true)} />
+      )}
+      <HamburgerDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        isMobile={isMobile}
+      />
+    </>
+  );
 }
 
+/** ==================== 应用入口 ==================== */
 export default function App() {
   return (
     <ConfigProvider

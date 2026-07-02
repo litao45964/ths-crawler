@@ -88,7 +88,17 @@ body {
   color: #8899aa;
 }
 
-/* ==================== 移动端适配 ==================== */
+/* ==================== Phase 1 导航重构新增样式 ==================== */
+
+/* 汉堡按钮 hover */
+.hamburger-btn:hover {
+  color: #e8eaf0 !important;
+}
+
+/* 移动端一级Tab底部栏 hover */
+.primary-tab-bar .ant-layout-footer {
+  background: #111a27;
+}
 
 /* 移动端卡片列表项 */
 .mobile-flow-card {
