@@ -33,7 +33,7 @@ export default function TrendAnalysis() {
 
   const [industries, setIndustries] = useState<{ label: string; value: string }[]>([]);
   const [selected, setSelected] = useState<string>('');
-  const [period, setPeriod] = useState(22);
+  const [period, setPeriod] = useState(14);
   const [trend, setTrend] = useState<TrendData | null>(null);
   const [loading, setLoading] = useState(false);
   const [calcLoading, setCalcLoading] = useState(false);
